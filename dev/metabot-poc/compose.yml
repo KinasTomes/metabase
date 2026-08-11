@@ -1,0 +1,45 @@
+name: metabot-poc
+
+services:
+  metabot-app-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${METABOT_APP_DB_NAME:-metabot}
+      POSTGRES_USER: ${METABOT_APP_DB_USER:-metabot}
+      POSTGRES_PASSWORD: ${METABOT_APP_DB_PASSWORD:?Set METABOT_APP_DB_PASSWORD in dev/metabot-poc/.env}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    volumes:
+      - metabot_app_db:/var/lib/postgresql/data
+
+  metabase:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      args:
+        MB_EDITION: ee
+        VERSION: ${METABOT_BUILD_VERSION:-v0.63.1.6-metabot-poc}
+    image: metabase-metabot-poc:local
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_HOST: metabot-app-db
+      MB_DB_PORT: 5432
+      MB_DB_DBNAME: ${METABOT_APP_DB_NAME:-metabot}
+      MB_DB_USER: ${METABOT_APP_DB_USER:-metabot}
+      MB_DB_PASS: ${METABOT_APP_DB_PASSWORD:?Set METABOT_APP_DB_PASSWORD in dev/metabot-poc/.env}
+      MB_JETTY_PORT: 3000
+      MB_SITE_URL: ${METABOT_SITE_URL:-http://localhost:3000}
+      MB_LOAD_SAMPLE_CONTENT: "false"
+      MB_ANON_TRACKING_ENABLED: "false"
+      MB_AI_FEATURES_ENABLED: "true"
+    depends_on:
+      metabot-app-db:
+        condition: service_healthy
+    ports:
+      - "${METABOT_HOST_PORT:-3000}:3000"
+
+volumes:
+  metabot_app_db:
