@@ -23,6 +23,23 @@ ENV PATH="/root/.local/bin:$PATH"
 
 COPY . .
 
+# Windows checkouts can preserve CRLF in executable shell scripts. Normalize
+# them inside the Linux build image so their shebangs remain executable without
+# changing the developer's working tree line endings.
+RUN find . -type f -name '*.sh' -exec sed -i 's/\r$//' {} +
+
+# `.dockerignore` intentionally omits the host's Git history, but the frontend
+# build reads Git metadata. Supply a minimal repository only when no repository
+# was copied into the build context.
+RUN git config --global --add safe.directory /home/node && \
+    if ! git -C /home/node rev-parse --is-inside-work-tree > /dev/null 2>&1; then \
+      git -C /home/node init && \
+      git -C /home/node config user.email "build@metabase.local" && \
+      git -C /home/node config user.name "Metabase image build" && \
+      git -C /home/node add --all && \
+      git -C /home/node commit -m "Build context"; \
+    fi
+
 # version is pulled from git, but git doesn't trust the directory due to different owners
 RUN git config --global --add safe.directory /home/node
 

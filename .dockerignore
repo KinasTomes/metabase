@@ -1,4 +1,8 @@
 .git
+.codegraph
+.qoder
+local-context
+METABOT_CUSTOMIZATION_WALKTHROUGH.md
 .babel_cache
 target
 .circleci
