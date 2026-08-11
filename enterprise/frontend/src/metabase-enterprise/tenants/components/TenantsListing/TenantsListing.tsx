@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { push } from "react-router-redux";
 import { t } from "ttag";
 
 import { AdminContentTable } from "metabase/admin/components/AdminContentTable";
@@ -11,7 +10,7 @@ import {
 import { ForwardRefLink } from "metabase/common/components/Link";
 import { UserAvatar } from "metabase/common/components/UserAvatar";
 import CS from "metabase/css/core/index.css";
-import { useDispatch } from "metabase/redux";
+import { useNavigate } from "metabase/router";
 import {
   Box,
   Button,
@@ -47,12 +46,12 @@ export const TenantsListing = ({
   children,
   hasNoTenants,
 }: TenantsListingProps) => {
-  const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   const openNewTenantModal = () => {
     const param = hasNoTenants ? "?onboarding=true" : "";
 
-    dispatch(push(Urls.newTenant() + param));
+    navigate(Urls.newTenant() + param);
   };
 
   const filteredTenants = useMemo(() => {
@@ -100,7 +99,7 @@ export const TenantsListing = ({
                 gap="md"
               >
                 <UserAvatar
-                  user={{ first_name: tenant.name }}
+                  user={{ name: tenant.name }}
                   bg={tenantIdToColor(tenant.id)}
                 />
                 <Box component="span" fw={700} c="core-brand">

@@ -1,11 +1,10 @@
 import {
   type ThunkDispatch,
-  type UnknownAction,
   createAction,
   createReducer,
 } from "@reduxjs/toolkit";
-import { push } from "react-router-redux";
 
+import { Api, refetchCurrentUser } from "metabase/api";
 import { loadLocalization } from "metabase/api/localization";
 import {
   type MfaChallengeResponse,
@@ -13,11 +12,10 @@ import {
   sessionApi,
 } from "metabase/api/session";
 import { openNavbar } from "metabase/redux/app";
-import { refreshSiteSettings } from "metabase/redux/settings";
-import { clearCurrentUser, refreshCurrentUser } from "metabase/redux/user";
 import { createAsyncThunk } from "metabase/redux/utils";
-import { getSetting } from "metabase/selectors/settings";
+import { navigate } from "metabase/router";
 import { getUser } from "metabase/selectors/user";
+import { getSetting, refetchSiteSettings } from "metabase/settings";
 import * as Urls from "metabase/urls";
 import { isSmallScreen, reload } from "metabase/utils/dom";
 import { isResourceNotFoundError } from "metabase/utils/errors";
@@ -52,8 +50,8 @@ export const refreshSession = createAsyncThunk(
   REFRESH_SESSION,
   async (_, { dispatch }) => {
     await Promise.all([
-      dispatch(refreshCurrentUser()),
-      dispatch(refreshSiteSettings()),
+      dispatch(refetchCurrentUser()),
+      dispatch(refetchSiteSettings()),
     ]);
     await dispatch(refreshLocale()).unwrap();
   },
@@ -144,20 +142,19 @@ export const logout = createAsyncThunk(
         const { "saml-logout-url": samlLogoutUrl } =
           (await initiateSLO(dispatch)) ?? {};
 
-        dispatch(clearCurrentUser());
         await dispatch(refreshLocale()).unwrap();
+
+        dispatch(Api.util.resetApiState());
 
         if (samlLogoutUrl) {
           window.location.href = samlLogoutUrl;
         }
       } else {
         await deleteSession(dispatch);
-        dispatch(clearCurrentUser());
         await dispatch(refreshLocale()).unwrap();
 
-        // We use old react-router-redux which references old redux, which does not require
-        // action type to be a string - unlike RTK v2+
-        dispatch(push(Urls.login()) as unknown as UnknownAction);
+        navigate(Urls.login());
+        dispatch(Api.util.resetApiState());
         reload(); // clears redux state and browser caches
       }
     } catch (error) {

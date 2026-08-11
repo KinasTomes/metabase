@@ -672,6 +672,25 @@
     (is (str/starts-with? (llm-shape/search-result->xml {:id 1 :type :card :name "c"}) "<metabase_question"))
     (is (str/starts-with? (llm-shape/search-result->xml {:id 1 :type :dataset :name "d"}) "<metabase-model"))))
 
+(deftest ^:parallel search-result-write-permission-test
+  (testing "renders false as an explicit destination permission"
+    (is (str/includes? (llm-shape/search-result->xml
+                        {:id 5 :type :dashboard :name "Read only" :can_write false})
+                       "can_write=\"false\"")))
+  (testing "omits write permission for search entities where it is not supplied"
+    (is (not (str/includes? (llm-shape/search-result->xml
+                             {:id 1 :type :table :name "Orders"})
+                            "can_write=")))))
+
+(deftest ^:parallel list-item-write-permission-test
+  (is (str/includes? (llm-shape/metabot-list->xml
+                      {:list-type :dashboards
+                       :items     [{:type "dashboard" :id 5 :name "Read only" :can_write false}]
+                       :total     1
+                       :page      1
+                       :pages     1})
+                     "can_write=\"false\"")))
+
 (deftest ^:parallel search-results->xml-test
   (testing "formats multiple search results"
     (let [results [{:id 1 :type :metric :name "Metric 1"}
@@ -866,3 +885,23 @@
       (testing "identity-only related tables render both the FK field name and id"
         (is (str/includes? xml "related_by_field_name=\"user_id\" related_by_field_id=\"303\""))
         (is (str/includes? xml "related_by_field_name=\"review_id\" related_by_field_id=\"404\""))))))
+
+(deftest ^:parallel transform->xml-source-query-test
+  (testing "a normalized (map) source query renders as verbatim SQL text"
+    (let [xml (llm-shape/transform->xml
+               {:id     7
+                :name   "Orders rollup"
+                :source {:type  :query
+                         :query {:stages [{:lib/type :mbql.stage/native
+                                           :native   "SELECT * FROM orders WHERE total < 100"}]}}})]
+      (is (str/includes? xml "<query>SELECT * FROM orders WHERE total < 100</query>"))))
+  (testing "a notebook-built source query renders as EDN with the metadata provider stripped"
+    (let [xml (llm-shape/transform->xml
+               {:id     8
+                :name   "Notebook rollup"
+                :source {:type  :query
+                         :query {:lib/type     :mbql/query
+                                 :lib/metadata :fake-metadata-provider
+                                 :stages       [{:lib/type :mbql.stage/mbql :source-table 1}]}}})]
+      (is (str/includes? xml ":mbql.stage/mbql"))
+      (is (not (str/includes? xml ":lib/metadata"))))))

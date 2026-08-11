@@ -68,9 +68,9 @@ export function TagEditorSidebar({
   const parameters = question.parameters();
   const parametersById = _.indexBy(parameters, "id");
 
-  const handleTabChange = (tab: string | null) => {
+  const handleTabChange = (tab: TabId | null) => {
     if (tab) {
-      setSection(tab as TabId);
+      setSection(tab);
     }
   };
 
@@ -89,6 +89,7 @@ export function TagEditorSidebar({
             tags={tags}
             parametersById={parametersById}
             database={database}
+            // Unjustified type cast. FIXME
             databases={databases as Database[]}
             originalQuestion={originalQuestion}
             setTemplateTag={setTemplateTag}

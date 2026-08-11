@@ -3,8 +3,8 @@ import { type ChangeEvent, useRef, useState } from "react";
 import { t } from "ttag";
 
 import EmptyDashboardBot from "assets/img/dashboard-empty.svg";
-import { useAdminSetting } from "metabase/api/utils";
 import CS from "metabase/css/core/index.css";
+import { useAdminSetting } from "metabase/settings";
 import {
   ActionIcon,
   Box,
@@ -51,6 +51,7 @@ export function MetabotIconField() {
     }
     const reader = new FileReader();
     reader.onload = async (readerEvent) => {
+      // Unjustified type cast. FIXME
       const dataUri = readerEvent.target?.result as string;
       if (!(await isFileIntact(dataUri))) {
         setIconError(

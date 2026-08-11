@@ -1,14 +1,14 @@
 import { useClickOutside } from "@mantine/hooks";
 import { useState } from "react";
-import { push } from "react-router-redux";
 import { t } from "ttag";
 
 import { Link } from "metabase/common/components/Link";
 import { LogoIcon } from "metabase/common/components/LogoIcon";
 import { useRegisterShortcut } from "metabase/palette/hooks/useRegisterShortcut";
 import { PLUGIN_SECURITY_CENTER } from "metabase/plugins";
-import { useDispatch, useSelector } from "metabase/redux";
+import { useSelector } from "metabase/redux";
 import type { AdminPath } from "metabase/redux/store";
+import { useNavigate } from "metabase/router";
 import { getIsPaidPlan } from "metabase/selectors/settings";
 import { getUserIsAdmin } from "metabase/selectors/user";
 import { Box, Button, Flex, Group, Icon } from "metabase/ui";
@@ -32,7 +32,7 @@ export const AdminNavbar = ({
 }: AdminNavbarProps) => {
   const isPaidPlan = useSelector(getIsPaidPlan);
   const isAdmin = useSelector(getUserIsAdmin);
-  const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   useRegisterShortcut(
     [
@@ -46,7 +46,7 @@ export const AdminNavbar = ({
           const path = adminPaths[key - 1]?.path;
 
           if (path) {
-            dispatch(push(path));
+            navigate(path);
           }
         },
       },

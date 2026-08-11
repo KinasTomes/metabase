@@ -192,7 +192,7 @@
 
 (deftest graph-transform-hydrates-creator-test
   (testing "GET /api/ee/dependencies/graph hydrates creator for transforms"
-    (mt/with-premium-features #{:dependencies :transforms-basic}
+    (mt/with-premium-features #{:dependencies :transforms-basic :hosting}
       (mt/with-temp [:model/Transform {transform-id :id} {:name "Test Transform"
                                                           :creator_id (mt/user->id :crowberto)}]
         (let [response (mt/user-http-request :crowberto :get 200 "ee/dependencies/graph"
@@ -999,14 +999,12 @@
                 ;; Create measure A (base measure) via API
                 {measure-a-id :id} (mt/user-http-request :crowberto :post 200 "measure"
                                                          {:name "Measure A"
-                                                          :table_id products-id
                                                           :definition (-> (lib/query mp products)
                                                                           (lib/aggregate (lib/sum price)))})
                 mp' (mt/metadata-provider)
                 ;; Create measure B that depends on measure A
                 {measure-b-id :id} (mt/user-http-request :crowberto :post 200 "measure"
                                                          {:name "Measure B"
-                                                          :table_id products-id
                                                           :definition (-> (lib/query mp' products)
                                                                           (lib/aggregate (lib/* (lib.metadata/measure mp' measure-a-id)
                                                                                                 2)))})
@@ -1014,7 +1012,6 @@
                 ;; Create measure C that depends on measure B
                 {measure-c-id :id} (mt/user-http-request :crowberto :post 200 "measure"
                                                          {:name "Measure C"
-                                                          :table_id products-id
                                                           :definition (-> (lib/query mp'' products)
                                                                           (lib/aggregate (lib/+ (lib.metadata/measure mp'' measure-b-id)
                                                                                                 100)))})]
@@ -2759,7 +2756,7 @@
                       response)))))))))
 
 (deftest data-analyst-can-access-dependency-graph-test
-  (mt/with-premium-features #{:data-studio :dependencies}
+  (mt/with-premium-features #{:data-studio :dependencies :transforms-basic :hosting}
     (testing "Data analysts can access dependency diagnostics endpoints"
       (let [data-analyst-group-id (:id (perms-group/data-analyst))]
         (mt/with-temp [:model/User {analyst-id :id} {:first_name "Data"

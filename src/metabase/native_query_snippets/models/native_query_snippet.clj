@@ -36,9 +36,9 @@
   [_]
   #{:snippets})
 
-(derive ::event :metabase/event)
+(events/derive! ::event :metabase/event)
 (doseq [e [:event/snippet-create :event/snippet-update :event/snippet-delete]]
-  (derive e ::event))
+  (events/derive! e ::event))
 
 (defn add-template-tags
   "Update the template tags based on the new contents."
@@ -109,10 +109,6 @@
   [snippet]
   (u/prog1 snippet
     (events/publish-event! :event/snippet-delete {:object <> :user-id api/*current-user-id*})))
-
-(defmethod serdes/hash-fields :model/NativeQuerySnippet
-  [_snippet]
-  [:name (serdes/hydrated-hash :collection) :created_at])
 
 (defmethod mi/can-read? :model/NativeQuerySnippet
   [& args]
@@ -193,10 +189,16 @@
   (when-let [collection_id (t2/select-one-fn :collection_id :model/NativeQuerySnippet :id id)]
     {["Collection" collection_id] {"NativeQuerySnippet" id}}))
 
-(defmethod serdes/dependencies "NativeQuerySnippet"
+(defmethod serdes/deserialization-dependencies "NativeQuerySnippet"
   [{:keys [collection_id]}]
   (when collection_id
     [[{:model "Collection" :id collection_id}]]))
+
+(defmethod serdes/serialization-dependencies "NativeQuerySnippet"
+  [_model-name {:keys [collection_id]}]
+  ;; A snippet only references its containing Collection, which a selective export may legitimately omit.
+  (when collection_id
+    #{[{:model "Collection" :id collection_id}]}))
 
 (defmethod serdes/storage-path "NativeQuerySnippet" [snippet ctx]
   (serdes/storage-default-collection-path snippet ctx "snippets"))

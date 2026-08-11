@@ -26,6 +26,7 @@ jest.mock("metabase/common/hooks/use-locale", () => ({
   useLocale: jest.fn(),
 }));
 
+// Unjustified type cast. FIXME
 const useLocaleMock = useLocale as jest.Mock;
 
 const BOBBY_TEST_COLLECTION = createMockCollection({
@@ -72,6 +73,41 @@ describe("CollectionBrowser", () => {
     expect(screen.getByText("Name")).toBeInTheDocument();
     expect(screen.getByText("Last edited by")).toBeInTheDocument();
     expect(screen.getByText("Last edited at")).toBeInTheDocument();
+  });
+
+  it("renders the empty table without requesting an undefined collection when the user has no personal collection", async () => {
+    // An API-key user (the data-app dev preview) never has a personal
+    // collection, so "personal" resolves to nothing. The browser must render
+    // its empty state, not request `/api/collection/undefined(/items)`.
+    useLocaleMock.mockReturnValue({ isLocaleLoading: false });
+    setupCollectionsEndpoints({
+      collections: TEST_COLLECTIONS,
+      rootCollection: ROOT_TEST_COLLECTION,
+    });
+
+    // API-key users (the data-app preview) come back with no
+    // `personal_collection_id`, though the type marks it required — simulate
+    // that shape.
+    const userWithoutPersonalCollection = {
+      ...createMockUser(),
+      personal_collection_id: undefined,
+    } as unknown as User;
+
+    renderWithSDKProviders(<CollectionBrowserInner collectionId="personal" />, {
+      componentProviderProps: { authConfig: createMockSdkConfig() },
+      storeInitialState: setupSdkState({
+        currentUser: userWithoutPersonalCollection,
+      }),
+    });
+
+    // The empty state renders, rather than nothing.
+    expect(
+      await screen.findByTestId("collection-empty-state"),
+    ).toBeInTheDocument();
+
+    expect(
+      fetchMock.callHistory.calls("glob:*/api/collection/undefined*"),
+    ).toHaveLength(0);
   });
 
   it("should allow to hide certain columns", async () => {
@@ -154,16 +190,16 @@ describe("CollectionBrowser", () => {
     expect(columnTexts).toContain("Description");
   });
 
-  it("should show dashboard questions by default", async () => {
+  it("should hide dashboard questions by default", async () => {
     await setup();
 
-    expect(getLastItemsRequestParam("show_dashboard_questions")).toBe("true");
+    expect(getLastItemsRequestParam("show_dashboard_questions")).toBe("false");
   });
 
-  it("should hide dashboard questions when showDashboardQuestions is false", async () => {
-    await setup({ props: { showDashboardQuestions: false } });
+  it("should show dashboard questions when showDashboardQuestions is true", async () => {
+    await setup({ props: { showDashboardQuestions: true } });
 
-    expect(getLastItemsRequestParam("show_dashboard_questions")).toBe("false");
+    expect(getLastItemsRequestParam("show_dashboard_questions")).toBe("true");
   });
 
   it("should resolve collectionId=tenant to user's tenant collection", async () => {

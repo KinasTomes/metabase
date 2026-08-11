@@ -51,7 +51,7 @@ describe("scenarios > dashboard > subscriptions", () => {
       openDashboardSubscriptions();
 
       // The sidebar starts open after the method there, so test that clicking the icon closes it
-      H.openDashboardMenu("Subscriptions");
+      H.toggleDashboardSubscriptionsSidebar();
       H.sidebar().should("not.exist");
     });
   });
@@ -117,8 +117,8 @@ describe("scenarios > dashboard > subscriptions", () => {
         cy.findByPlaceholderText("Enter user names or email addresses");
 
         // Change the schedule to "Monthly"
-        cy.findByDisplayValue("Hourly").click();
-        H.popover().findByText("Monthly").click();
+        cy.findByTestId("select-frequency").click();
+        H.popover().findByText("monthly").click();
 
         H.sidebar().button("Done").should("be.disabled");
       });
@@ -184,9 +184,10 @@ describe("scenarios > dashboard > subscriptions", () => {
         openDashboardSubscriptions();
 
         H.sidebar().within(() => {
-          cy.findByPlaceholderText("Enter user names or email addresses")
-            .click()
-            .type(`${normal.first_name} ${normal.last_name}{enter}`);
+          cy.findByPlaceholderText(
+            "Enter user names or email addresses",
+          ).click();
+          H.popover().contains(normal.first_name).click();
           clickButton("Done");
 
           cy.findByLabelText("add icon").click();
@@ -357,10 +358,7 @@ describe("scenarios > dashboard > subscriptions", () => {
       });
       cy.reload();
 
-      H.dashboardHeader()
-        .findByLabelText("[zz] Move, trash, and more…")
-        .click();
-      H.popover().findByText("[zz] Subscriptions").click();
+      H.toggleDashboardSubscriptionsSidebar();
       H.sidebar()
         .findByText(/\[zz\] hourly/)
         .click();
@@ -402,14 +400,14 @@ describe("scenarios > dashboard > subscriptions", () => {
       assignRecipient();
       H.sidebar().findByText("To:").click();
 
-      cy.findByDisplayValue("Hourly").click();
-      H.popover().findByText("Monthly").click();
+      cy.findByTestId("select-frequency").click();
+      H.popover().findByText("monthly").click();
 
-      cy.findByDisplayValue("First").click();
-      H.popover().findByText("15th (Midpoint)").click();
+      cy.findByTestId("select-frame").click();
+      H.popover().findByText("15th").click();
 
-      cy.findByDisplayValue("15th (Midpoint)").click();
-      H.popover().findByText("First").click();
+      cy.findByTestId("select-frame").click();
+      H.popover().findByText("first").click();
 
       clickButton("Done");
       // Implicit assertion (word mustn't contain string "null")
@@ -596,8 +594,8 @@ describe("scenarios > dashboard > subscriptions", () => {
     it("should allow non-admin users to create subscriptions", () => {
       cy.signInAsNormalUser();
       H.visitDashboard(ORDERS_DASHBOARD_ID);
-      H.openDashboardMenu();
-      H.popover().findByText("Subscriptions").should("be.visible");
+      H.toggleDashboardSubscriptionsSidebar();
+      H.sidebar().should("be.visible");
     });
 
     it("should persist the immutable Slack channel_id alongside the channel name", () => {
@@ -908,7 +906,7 @@ describe("scenarios > dashboard > subscriptions", () => {
         H.visitDashboard(ORDERS_DASHBOARD_ID);
 
         H.openSharingMenu();
-        H.sharingMenu().findByRole("menuitem", { name: "Embed" }).click();
+        H.sharingMenu().findByRole("button", { name: "Embed" }).click();
         cy.findByLabelText("Metabase account (SSO)").click();
         embedModalEnableEmbedding();
         cy.findByLabelText("Allow subscriptions").check().should("be.checked");
@@ -934,7 +932,7 @@ describe("scenarios > dashboard > subscriptions", () => {
 function openDashboardSubscriptions(dashboard_id = ORDERS_DASHBOARD_ID) {
   // Orders in a dashboard
   H.visitDashboard(dashboard_id);
-  H.openDashboardMenu("Subscriptions");
+  H.toggleDashboardSubscriptionsSidebar();
 }
 
 function assignRecipient({
@@ -944,9 +942,9 @@ function assignRecipient({
   openDashboardSubscriptions(dashboard_id);
   cy.findByText("Email it").click();
 
-  cy.findByPlaceholderText("Enter user names or email addresses")
-    .type(`${user.first_name} ${user.last_name}{enter}`)
-    .blur();
+  cy.findByPlaceholderText("Enter user names or email addresses").click();
+  H.popover().contains(user.first_name).click();
+  cy.realPress("Escape");
 }
 
 function assignRecipients({

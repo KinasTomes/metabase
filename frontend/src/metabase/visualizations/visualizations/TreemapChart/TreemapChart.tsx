@@ -37,11 +37,12 @@ import { useLabelMeasurement } from "./use-label-measurement";
 import { usePointerTracking } from "./use-pointer-tracking";
 import { useTreemapNavigation } from "./use-treemap-navigation";
 
-export const TreemapChart = ({
+const TreemapChartComponent = ({
   rawSeries,
   settings,
   fontFamily,
   onVisualizationClick,
+  onRender,
   clicked,
   isDashboard,
   isDocument,
@@ -50,6 +51,11 @@ export const TreemapChart = ({
   const rawSeriesWithRemappings = useMemo(
     () => extractRemappings(rawSeries),
     [rawSeries],
+  );
+
+  const showWarning = useCallback(
+    (warning: string) => onRender({ warnings: [warning] }),
+    [onRender],
   );
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -72,10 +78,11 @@ export const TreemapChart = ({
       treemapColumns,
       treemapRows,
       settings,
+      showWarning,
     );
     const colors = getTreemapColors(tree, treemapRows);
     return { tree, colors, treemapColumns };
-  }, [rawSeriesWithRemappings, settings]);
+  }, [rawSeriesWithRemappings, settings, showWarning]);
 
   const { viewRootId, viewRootIdRef, setViewRoot } = useTreemapNavigation(
     chartData?.tree ?? null,
@@ -86,7 +93,11 @@ export const TreemapChart = ({
   const formatters = useMemo(
     () =>
       chartData
-        ? getTreemapFormatters(chartData.treemapColumns, settings)
+        ? getTreemapFormatters(
+            chartData.treemapColumns,
+            settings,
+            chartData.tree,
+          )
         : null,
     [chartData, settings],
   );
@@ -281,4 +292,7 @@ export const TreemapChart = ({
   );
 };
 
-Object.assign(TreemapChart, TREEMAP_CHART_DEFINITION);
+export const TreemapChart = Object.assign(
+  TreemapChartComponent,
+  TREEMAP_CHART_DEFINITION,
+);

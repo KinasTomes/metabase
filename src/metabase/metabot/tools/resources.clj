@@ -56,18 +56,31 @@
   - metabase://transform/{id}/sources - tables/databases this transform reads from
   - metabase://transform/{id}/target - table this transform writes to
   - metabase://dashboard/{id} - dashboard details
-  - metabase://dashboard/{id}/items - cards on the dashboard"
+  - metabase://dashboard/{id}/items - cards on the dashboard
+  - metabase://document/{id} - document name + indexed outline of its top-level blocks
+
+  Conversation state (agent-memory charts/queries, e.g. pasted chart mentions):
+  - metabase://chart/{chart_id} - chart type + query of a conversation chart
+  - metabase://query/{query_id} - a query from this conversation's state"
   (:require
    [clojure.string :as str]
    [metabase.activity-feed.core :as activity-feed]
    [metabase.api.common :as api]
+   [metabase.documents.core :as documents]
+   [metabase.documents.prose-mirror :as prose-mirror]
+   [metabase.metabot.agent.streaming :as streaming]
    [metabase.metabot.scope :as scope]
+   [metabase.metabot.tmpl :as te]
    [metabase.metabot.tools.entity-details :as entity-details]
    [metabase.metabot.tools.field-stats :as field-stats]
+   [metabase.metabot.tools.shared :as shared]
    [metabase.metabot.tools.shared.instructions :as instructions]
    [metabase.metabot.tools.shared.llm-shape :as llm-shape]
    [metabase.models.interface :as mi]
+   [metabase.permissions.core :as perms]
    [metabase.transforms.core :as transforms]
+   [metabase.util :as u]
+   [metabase.util.i18n :refer [tru]]
    [metabase.util.log :as log]
    [metabase.util.malli :as mu]
    [metabase.util.match :as match]
@@ -176,7 +189,7 @@
 (defn- present-collection
   "Trim a collection row to an item map. `path-name` may be supplied if the caller pre-computed it."
   ([coll] (present-collection coll nil))
-  ([{:keys [id name location authority_level description personal_owner_id]} path-name]
+  ([{:keys [id name location authority_level description personal_owner_id] :as coll} path-name]
    {:type              "collection"
     :id                id
     :name              name
@@ -184,6 +197,7 @@
     :location          location
     :authority_level   authority_level
     :is_personal       (boolean personal_owner_id)
+    :can_write         (boolean (mi/can-write? coll))
     :description       description
     :uri               (llm-shape/metabase-uri :collection id)}))
 
@@ -216,13 +230,23 @@
      :uri           (llm-shape/metabase-uri (keyword model-type) id)}))
 
 (defn- present-dashboard
-  [{:keys [id name collection_id description]}]
+  [{:keys [id name collection_id description] :as dashboard}]
   {:type          "dashboard"
    :id            id
    :name          name
    :collection_id collection_id
+   :can_write     (boolean (mi/can-write? dashboard))
    :description   description
    :uri           (llm-shape/metabase-uri :dashboard id)})
+
+(defn- present-document
+  [{:keys [id name collection_id] :as document}]
+  {:type          "document"
+   :id            id
+   :name          name
+   :collection_id collection_id
+   :can_write     (boolean (mi/can-write? document))
+   :uri           (llm-shape/metabase-uri :document id)})
 
 (defn- present-transform
   [{:keys [id name description source_database_id]}]
@@ -268,10 +292,12 @@
 ;; ----- Fetch handlers (one per URI shape) -----
 
 (defn- fetch-databases-list [query-params]
-  (let [dbs (->> (t2/select [:model/Database :id :name :engine :description :is_audit]
-                            :is_audit false
-                            :router_database_id nil
-                            {:order-by [[:%lower.name :asc]]})
+  (let [all (t2/select [:model/Database :id :name :engine :description :is_audit]
+                       :is_audit false
+                       :router_database_id nil
+                       {:order-by [[:%lower.name :asc]]})
+        _   (perms/prime-database-perms-cache {:db-ids (into #{} (map :id) all)})
+        dbs (->> all
                  (filter mi/can-read?)
                  (mapv present-database))]
     (list-result :databases dbs query-params)))
@@ -336,6 +362,7 @@
 (defn- fetch-database-tables [id-str query-params]
   (let [db-id  (parse-long id-str)
         _      (warehouses/get-database db-id)
+        _      (perms/prime-table-perms-cache {:db-ids #{db-id}})
         tables (->> (t2/select [:model/Table :id :name :display_name :schema :db_id :description]
                                :db_id  db-id
                                :active true
@@ -405,6 +432,11 @@
                                        :archived      false
                                        {:order-by [[:%lower.name :asc]]})
                             (filter mi/can-read?))
+        documents      (->> (t2/select [:model/Document :id :name :collection_id]
+                                       :collection_id coll-id
+                                       :archived      false
+                                       {:order-by [[:%lower.name :asc]]})
+                            (filter mi/can-read?))
         subcollections (->> (t2/select [:model/Collection :id :name :location :authority_level
                                         :description :personal_owner_id]
                                        :location (str (:location coll) coll-id "/")
@@ -413,7 +445,8 @@
                             (filter mi/can-read?))
         items          (concat (map present-collection subcollections)
                                (map present-card cards)
-                               (map present-dashboard dashboards))]
+                               (map present-dashboard dashboards)
+                               (map present-document documents))]
     (list-result :collection-items items query-params)))
 
 (defn- fetch-collection-subcollections [id-str query-params]
@@ -605,27 +638,154 @@
 ;; ----- Dashboard -----
 
 (defn- fetch-dashboard [id-str]
-  (let [result (entity-details/get-dashboard-details {:dashboard-id (parse-long id-str)})]
+  (let [dashboard-id (parse-long id-str)
+        result       (entity-details/get-dashboard-details {:dashboard-id dashboard-id})]
     (if-let [dashboard (:structured-output result)]
-      {:structured-output (assoc dashboard :result-type :entity)}
+      {:structured-output (assoc dashboard
+                                 :result-type :entity
+                                 :can_write (boolean (mi/can-write? :model/Dashboard dashboard-id)))}
       {:status-code 404 :output (:output result)})))
 
-(defn- fetch-dashboard-items [id-str query-params]
+(defn- present-non-question-dashcard
+  "Dashcards not rendered as a saved question — virtual cards (headings, text, links, ...) and
+   action buttons (which may reference a backing model via `card_id` but render as a button).
+   They carry their `dashcard_id` — the handle `update_dashboard` remove/move/update_text
+   mutations take. The card's text (or a link card's target) renders as the item body via
+   `:description`."
+  [{:keys [id action_id visualization_settings]}]
+  (let [display (some-> (get-in visualization_settings [:virtual_card :display]) name)]
+    ;; action_id wins over the virtual display: frontend-created action buttons carry BOTH an
+    ;; action_id and a virtual_card with display "action", and should read as one type.
+    {:type        (cond
+                    action_id "action"
+                    display   (str "virtual_" display)
+                    :else     "virtual_dashcard")
+     :dashcard_id id
+     ;; action buttons carry their visible label here; nil for virtual cards
+     :name        (:button.label visualization_settings)
+     ;; external link URLs only: an entity link's stored :link :entity snapshot (name etc.) may
+     ;; describe something this user can't read, so rendering it would bypass the read-check the
+     ;; REST path applies via the :dashcard/linkcard-info hydration
+     :description (or (:text visualization_settings)
+                      (get-in visualization_settings [:link :url]))}))
+
+(defn- fetch-dashboard-items
+  "One item per dashcard in row/col (layout) order, each carrying the `dashcard_id` that
+   `update_dashboard` remove/move/update_text mutations take. On a tabbed dashboard the items come
+   grouped by tab (nil-tab dashcards belong to the first tab, where the frontend renders them),
+   each carries its `tab_id`, and the response's `:tabs` lists every tab — empty ones included —
+   in display order. Card-backed dashcards keep the card fields; virtual dashcards (headings,
+   text, links, ...) render their text; action buttons keep a `uri` to their backing model when
+   it's readable. Dashcards whose card is archived or unreadable are omitted."
+  [id-str query-params]
   (let [dashboard-id (parse-long id-str)
         _            (api/read-check :model/Dashboard dashboard-id)
-        cards        (->> (t2/select [:model/Card :id :name :type :description :card_schema
-                                      :collection_id :database_id :table_id]
-                                     {:where    [:and
-                                                 [:= :archived false]
-                                                 [:exists {:select 1
-                                                           :from   [[:report_dashboardcard :dc]]
-                                                           :where  [:and
-                                                                    [:= :dc.card_id :report_card.id]
-                                                                    [:= :dc.dashboard_id dashboard-id]]}]]
-                                      :order-by [[:%lower.name :asc]]})
-                          (filter mi/can-read?)
-                          (mapv present-card))]
-    (list-result :dashboard-items cards query-params)))
+        tabs         (t2/select [:model/DashboardTab :id :name] :dashboard_id dashboard-id
+                                {:order-by [[:position :asc] [:id :asc]]})
+        dashcards    (t2/select [:model/DashboardCard :id :card_id :action_id :dashboard_tab_id
+                                 :visualization_settings]
+                                :dashboard_id dashboard-id
+                                {:order-by [[:row :asc] [:col :asc]]})
+        card-ids     (into #{} (keep :card_id) dashcards)
+        readable     (when (seq card-ids)
+                       (->> (t2/select [:model/Card :id :name :type :description :card_schema
+                                        :collection_id :database_id :table_id]
+                                       :id [:in card-ids]
+                                       :archived false)
+                            (filter mi/can-read?)
+                            (into {} (map (juxt :id identity)))))
+        ->item       (fn [{:keys [id card_id action_id] :as dashcard}]
+                       ;; action_id wins over card_id: an action button may reference its backing
+                       ;; model through card_id but renders as a button — with a uri to that model
+                       ;; so it stays drillable.
+                       (if (and card_id (not action_id))
+                         (when-let [card (get readable card_id)]
+                           (assoc (present-card card) :dashcard_id id))
+                         (cond-> (present-non-question-dashcard dashcard)
+                           (get readable card_id) (assoc :uri (:uri (present-card (get readable card_id)))))))
+        items        (if (seq tabs)
+                       ;; group by tab without emitting tab pseudo-items — those would inflate the
+                       ;; paginated total; the tab list rides on the response as `:tabs` instead.
+                       ;; `sort-by` is stable, so the SQL row/col ordering survives within each
+                       ;; tab; a nil tab id means the frontend renders the card on the first tab.
+                       (let [tab-pos (into {} (map-indexed (fn [i {:keys [id]}] [id i])) tabs)
+                             eff-tab #(or (:dashboard_tab_id %) (:id (first tabs)))]
+                         (into []
+                               (keep (fn [dashcard]
+                                       (some-> (->item dashcard) (assoc :tab_id (eff-tab dashcard)))))
+                               (sort-by (comp tab-pos eff-tab) dashcards)))
+                       (into [] (keep ->item) dashcards))]
+    (cond-> (list-result :dashboard-items items query-params)
+      (seq tabs) (update :structured-output assoc :tabs (mapv #(select-keys % [:id :name]) tabs)))))
+
+;; ----- Document -----
+
+(defn- document-block-line
+  "One outline line for a top-level document block: `[index] type`, plus the ids of any
+  embedded cards and a truncated text preview when the block has either."
+  [index block]
+  (let [card-ids (->> (tree-seq :content :content block)
+                      (keep #(when (= (:type %) prose-mirror/card-embed-type)
+                               (-> % :attrs :id))))
+        text     (prose-mirror/ast->text block)]
+    (str "[" index "] " (:type block)
+         (when (seq card-ids)
+           (str " (embeds card " (str/join ", " card-ids) ")"))
+         (when-not (str/blank? text)
+           (str ": " (u/truncate text 200))))))
+
+(defn- fetch-document
+  "Present a document as an indexed outline of its top-level blocks. The indices are the
+  `position` values the `save_entity` tool accepts when inserting a chart into the document."
+  [id-str]
+  (let [document (documents/get-document (parse-long id-str))
+        blocks   (get-in document [:document :content])]
+    (entity-result
+     {:type        "document"
+      :id          (:id document)
+      :name        (:name document)
+      :can_write   (boolean (:can_write document))
+      :description (if (seq blocks)
+                     (str "Top-level blocks, listed as `[index] type`. Inserting at `position` i "
+                          "places new content before the block currently at index i:\n"
+                          (str/join "\n" (map-indexed document-block-line blocks)))
+                     "The document is empty.")})))
+
+(defn- fetch-conversation-query
+  "Present a query stored in this conversation's agent state (created by tools or pasted
+  as a chart mention). Read-checks the query's database before exporting it with resolved
+  table/field names."
+  [query-id]
+  (if-let [query (get (shared/current-queries-state) query-id)]
+    (do
+      (when-let [database-id (and (map? query) (:database query))]
+        (api/read-check :model/Database database-id))
+      (entity-result
+       {:type        "conversation-query"
+        :id          query-id
+        :description (llm-shape/export-query-for-llm query)}))
+    {:status-code 404
+     :output (str "No chart or query with id '" query-id "' exists in this conversation. "
+                  "It may belong to another conversation; ask the user to paste or recreate it here.")}))
+
+(defn- fetch-conversation-chart
+  "Present a chart stored in this conversation's agent state (created by chart tools or
+  pasted as a mention). Falls back to the queries state when the id is actually a query id."
+  [chart-id]
+  (if-let [chart (get (shared/current-charts-state) chart-id)]
+    (let [query (or (first (:queries chart))
+                    (get (shared/current-queries-state) (:query_id chart)))]
+      (when-let [database-id (and (map? query) (:database query))]
+        (api/read-check :model/Database database-id))
+      (entity-result
+       {:type        "conversation-chart"
+        :id          chart-id
+        :description (str "Chart type: "
+                          (or (some-> (get-in chart [:visualization_settings :chart_type]) name)
+                              "table")
+                          "\nQuery:\n"
+                          (llm-shape/export-query-for-llm query))}))
+    (fetch-conversation-query chart-id)))
 
 ;; ----- Dispatch -----
 
@@ -709,9 +869,92 @@
       ["dashboard" id]                                 (fetch-dashboard id)
       ["dashboard" id "items"]                         (fetch-dashboard-items id query-params)
 
+      ;; Document
+      ["document" id]                                  (fetch-document id)
+
+      ;; Conversation state
+      ["chart" id]                                     (fetch-conversation-chart id)
+      ["query" id]                                     (fetch-conversation-query id)
+
       ;; Default — required to make match non-recursive
       _ (throw (ex-info (str "Unsupported URI: " uri)
                         {:uri uri :segments segments})))))
+
+;; ----- Display titles -----
+
+(def ^:private link-models
+  "URI leading segment -> model, for entities rendered as `metabase://` links. Mirrors
+   `METABASE_PROTOCOL_ENTITY_MODELS` in metabot/utils/links.ts — keep the two in sync."
+  {"dashboard"  :model/Dashboard
+   "database"   :model/Database
+   "collection" :model/Collection
+   "table"      :model/Table
+   "question"   :model/Card
+   "model"      :model/Card
+   "document"   :model/Document
+   "transform"  :model/Transform})
+
+(def ^:private plain-models
+  "URI leading segment -> model for entities that aren't `metabase://`-linkable; their
+   name still shows as plain text instead of the bare \"Reading resource\" fallback."
+  {"metric"  :model/Card
+   "measure" :model/Measure
+   "segment" :model/Segment})
+
+(defn- nav-noun
+  "Localized noun for a top-level navigation URI, so browsing reads as e.g.
+   \"Read databases\" rather than the bare fallback."
+  [segments]
+  (case segments
+    ["databases"]           (tru "databases")
+    ["collections"]         (tru "collections")
+    ["user" "recent-items"] (tru "recent items")
+    nil))
+
+(defn- aspect-noun
+  "Localized noun for the sub-resource an `entity/{id}/…` URI drills into; words match
+   existing site copy. nil for the bare entity."
+  [segment aspect]
+  (if (and (= segment "dashboard") (= aspect "items"))
+    (tru "cards")
+    (case aspect
+      "fields"         (tru "fields")
+      "derived"        (tru "dependents")
+      "sources"        (tru "sources")
+      "dimensions"     (tru "dimensions")
+      "items"          (tru "items")
+      "tables"         (tru "tables")
+      "models"         (tru "models")
+      "schemas"        (tru "schemas")
+      "subcollections" (tru "subcollections")
+      "target"         (tru "target")
+      nil)))
+
+(defn- uri-label
+  "Label for one successfully read resource, built from what the read returned — no
+   extra queries. The entity plus any drilled-into aspect (`[Orders](…) columns`), an
+   aspect noun alone when the result carries no entity name (`tables`), or a
+   navigation noun (`databases`). nil when nothing fits."
+  [{:keys [uri content]}]
+  (let [{segments :segments} (parse-uri uri)
+        [segment id-str & rst] segments
+        id          (some-> id-str parse-long)
+        ;; tables carry a raw :name (ORDERS) and a friendly :display_name (Orders);
+        ;; prefer the latter so the label matches the search results
+        entity-name (when (and id (or (link-models segment) (plain-models segment)))
+                      (let [so (:structured-output content)]
+                        (or (:display_name so) (:name so))))
+        title       (when (string? entity-name)
+                      (if (link-models segment)
+                        (te/link entity-name "metabase://" segment "/" id)
+                        entity-name))
+        ;; drop the trailing field/dimension id so `.../fields/10` still reads as "fields"
+        noun        (when id (aspect-noun segment (last (remove parse-long rst))))]
+    (cond
+      (and title noun) (str title " " noun)
+      title            title
+      noun             noun
+      :else            (nav-noun segments))))
 
 ;; ----- Tool entry points -----
 
@@ -728,7 +971,7 @@
         {:uri uri :error (or (:output result) result)}
         {:uri uri :content result}))
     (catch Exception e
-      (log/warn "Error fetching resource" {:uri uri :error (ex-message e)})
+      (log/warn "Error fetching resource" {:error (ex-message e)})
       {:uri uri :error (or (ex-message e) "Unknown error")})))
 
 (defn- format-with-instructions
@@ -789,15 +1032,24 @@
 
   ;; Fetch all URIs (sequentially for now, could parallelize with pmap)
   (let [resources (mapv fetch-single-uri uris)
-        formatted (format-resources resources)]
+        formatted (format-resources resources)
+        labels    (into []
+                        (comp (filter :content)
+                              (keep #(try (uri-label %) (catch Throwable _ nil)))
+                              (distinct))
+                        resources)]
     (log/info "Fetched resources" {:total      (count resources)
                                    :successful (count (filter :content resources))
                                    :errors     (count (filter :error resources))})
-    {:resources resources
-     :output formatted}))
+    (cond-> {:resources resources
+             :output    formatted}
+      (seq labels)
+      ;; just the object (the entities/aspects) — the client wraps it in the verb
+      ;; + tense ("Reading …" while active, "Read …" once settled)
+      (assoc :data-parts [(streaming/tool-title-part (str/join ", " labels))]))))
 
-(mu/defn ^{:tool-name "read_resource"
-           :scope     scope/agent-resource-read}
+(mu/defn ^{:tool-name  "read_resource"
+           :scope      scope/agent-resource-read}
   read-resource-tool
   "Read detailed information about Metabase resources via URI patterns. Use this to navigate
   the instance and drill into specific entities. URIs returned by `search` can be fed directly
@@ -833,11 +1085,18 @@
   - metabase://measure/{id}
   - metabase://segment/{id}
   - metabase://transform/{id}[/sources|/target]
-  - metabase://dashboard/{id}[/items]"
+  - metabase://dashboard/{id}[/items]
+  - metabase://document/{id} - name + indexed outline of the document's top-level blocks
+    (the indices are valid `position` values for `save_entity` document destinations)
+
+  CONVERSATION STATE (charts and queries generated in or pasted into this conversation,
+  e.g. referenced in a user message as [name](metabase://chart/{id})):
+  - metabase://chart/{chart_id} - the chart's type and its query
+  - metabase://query/{query_id} - the query definition"
   [{:keys [uris]} :- [:map {:closed true}
                       [:uris [:sequential [:string {:description "Metabase resource URIs to fetch"}]]]]]
   (try
     (read-resource {:uris uris})
     (catch Exception e
-      (log/error e "Error in read_resource tool")
+      (log/errorf "Error in read_resource tool: %s" (ex-message e))
       {:output (str "Failed to read resources: " (or (ex-message e) "Unknown error"))})))

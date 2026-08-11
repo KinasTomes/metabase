@@ -22,9 +22,12 @@
    [metabase.channel.email.messages :as messages]
    [metabase.events.core :as events]
    [metabase.premium-features.core :as premium-features]
+   [metabase.request.core :as request]
    [metabase.sso.core :as sso]
+   [metabase.util :as u]
    [metabase.util.encryption :as encryption]
    [metabase.util.i18n :refer [tru]]
+   [metabase.util.log :as log]
    [metabase.util.malli.schema :as ms]
    [metabase.util.password :as u.password]
    [throttle.core :as throttle]
@@ -67,9 +70,15 @@
                     (t2/select-one-fn :credentials :model/AuthIdentity :user_id user-id :provider "password")]
            (and password_hash (u.password/verify-password password password_salt password_hash)))
          (when (sso/ldap-enabled)
-           (when-let [user-email (t2/select-one-fn :email :model/User user-id)]
-             (when-let [user-info (sso/find-user user-email)]
-               (sso/verify-password user-info password))))))))
+           ;; an unreachable directory fails closed: re-auth is denied (the user retries when the
+           ;; directory is back; admin/remove needs no re-auth), never an unhandled 500
+           (try
+             (when-let [user-email (t2/select-one-fn :email :model/User user-id)]
+               (when-let [user-info (sso/find-user user-email)]
+                 (sso/verify-password user-info password)))
+             (catch Exception e
+               (log/warnf "LDAP re-auth failed because the directory is unreachable: %s" (ex-message e))
+               false)))))))
 
 ;; Notification emails here are fire-and-log by construction: the messages/send-mfa-*-email!
 ;; senders route through email/send-message!, which catches and logs delivery failures — so an
@@ -164,32 +173,52 @@
 ;;; -------------------------------------------------- Admin --------------------------------------------------
 
 (api.macros/defendpoint :post "/admin/remove" :- nil
-  "Admin: remove a user's two-factor enrollment entirely — the lockout escape hatch for a lost
-  authenticator with no recovery codes. Never feature-gated (a lapsed license must not make
-  lockouts permanent). The affected user is notified by email. They re-enroll from scratch —
-  there is nothing to \"reset\", the secret lives on their device."
+  "Admin: remove *another* user's two-factor enrollment entirely — the lockout escape hatch for a
+  lost authenticator with no recovery codes. Never feature-gated (a lapsed license must not make
+  lockouts permanent). The affected user is notified by email. They re-enroll from scratch — there
+  is nothing to \"reset\", the secret lives on their device.
+
+  Removing your *own* enrollment is deliberately refused here: this is a user-management endpoint
+  that takes no second factor (the target can't produce one — that's why an admin is removing it),
+  and the admin UI never collects a code. Self-removal goes through the normal Security page, which
+  re-auths with a fresh factor via `/disable`. Without this guard a hijacked admin session could
+  strip its own 2FA with only a cookie, turning transient access into a permanent password bypass."
   [_route-params
    _query-params
    {user-id :user_id} :- [:map [:user_id ms/PositiveInt]]]
   (api/check-superuser)
+  (when (= user-id api/*current-user-id*)
+    (throw (ex-info (tru "You cannot administratively remove your own two-factor authentication. Please use the normal removal method in your account settings.")
+                    {:status-code 400})))
   (when (enrollment/disable! user-id)
     (let [user (t2/select-one :model/User :id user-id)]
       (messages/send-mfa-removed-by-admin-email! (:email user))
       (events/publish-event! :event/mfa-disabled {:object user})))
   api/generic-204-no-content)
 
+(def ^:private confirmed-totp-exists
+  ;; enrollment state is the auth_identity.confirmed_at COLUMN (queryable), not the encrypted
+  ;; credentials JSON
+  [:exists {:select [1]
+            :from   [:auth_identity]
+            :where  [:and
+                     [:= :auth_identity.user_id :core_user.id]
+                     [:= :auth_identity.provider "totp"]
+                     [:not= :auth_identity.confirmed_at nil]]}])
+
 (def ^:private unenrolled-user-where
-  ;; active personal users without a confirmed TOTP enrollment; enrollment state is the
-  ;; auth_identity.confirmed_at COLUMN (queryable), not the encrypted credentials JSON
+  ;; active personal users without a confirmed TOTP enrollment
   [:and
    [:= :core_user.is_active true]
    [:= :core_user.type "personal"]
-   [:not [:exists {:select [1]
-                   :from   [:auth_identity]
-                   :where  [:and
-                            [:= :auth_identity.user_id :core_user.id]
-                            [:= :auth_identity.provider "totp"]
-                            [:not= :auth_identity.confirmed_at nil]]}]]])
+   [:not confirmed-totp-exists]])
+
+(def ^:private enrolled-user-where
+  ;; Deliberately unfiltered beyond the enrollment itself, so this matches `enrolled_count`: that
+  ;; counts auth_identity rows, and the unique (user_id, provider) constraint makes it 1:1 with
+  ;; users. Deactivated users therefore appear here — correctly, since their enrollment still
+  ;; exists and an admin can still remove it.
+  confirmed-totp-exists)
 
 (api.macros/defendpoint :get "/admin/overview" :- [:map
                                                    [:encryption_key_set :boolean]
@@ -202,6 +231,108 @@
   {:encryption_key_set (encryption/default-encryption-enabled?)
    :enrolled_count     (t2/count :model/AuthIdentity :provider "totp" :confirmed_at [:not= nil])
    :unenrolled_count   (t2/count :model/User {:where unenrolled-user-where})})
+
+;;; -------------------------------------------------- Admin user lists --------------------------------------------------
+
+(def ^:private list-columns
+  [:id :email :first_name :last_name :sso_source :is_active :is_superuser])
+
+(def ^:private enrolled-at-select
+  ;; a correlated scalar subselect rather than a join: the unique (user_id, provider) constraint
+  ;; guarantees at most one row, and joining would force qualifying every selected column, since
+  ;; auth_identity also has id/created_at/updated_at
+  [[{:select [:auth_identity.confirmed_at]
+     :from   [:auth_identity]
+     :where  [:and
+              [:= :auth_identity.user_id :core_user.id]
+              [:= :auth_identity.provider "totp"]]}
+    :enrolled_at]])
+
+(defn- search-where
+  "Mirrors the People page's search (`metabase.users.models.user/query-clause`, which is private).
+  Note `:%lower.x` splits on `.` and so cannot be table-qualified — fine here because neither list
+  query joins."
+  [query]
+  (when-not (str/blank? query)
+    (let [pattern (str "%" (u/lower-case-en query) "%")]
+      [:or
+       [:like :%lower.first_name pattern]
+       [:like :%lower.last_name  pattern]
+       [:like :%lower.email      pattern]])))
+
+(defn- user-list-response
+  "Name-ordered, offset-paged list of users matching `where`, in the standard
+  {:data :total :limit :offset} envelope."
+  [where extra-select query]
+  (let [search (search-where query)
+        where  (cond-> [:and where]
+                 search (conj search))]
+    {:data   (t2/select :model/User
+                        (cond-> {:select   (into list-columns extra-select)
+                                 :where    where
+                                 :order-by [[:%lower.first_name :asc]
+                                            [:%lower.last_name  :asc]
+                                            [:id :asc]]}
+                          ;; (request/limit) is nil on an unpaged request, and `:limit nil` would
+                          ;; emit `LIMIT NULL`
+                          (request/paged?) (assoc :limit  (request/limit)
+                                                  :offset (request/offset))))
+     :total  (t2/count :model/User {:where where})
+     :limit  (request/limit)
+     :offset (request/offset)}))
+
+(def ^:private admin-mfa-user-entries
+  [[:id           ms/PositiveInt]
+   [:email        ms/NonBlankString]
+   [:first_name   [:maybe :string]]
+   [:last_name    [:maybe :string]]
+   [:common_name  :string]
+   [:sso_source   [:maybe :keyword]]
+   [:is_active    :boolean]
+   [:is_superuser :boolean]])
+
+(defn- paged-schema [row]
+  [:map {:closed true}
+   [:data   [:sequential row]]
+   [:total  :int]
+   [:limit  [:maybe :int]]
+   [:offset [:maybe :int]]])
+
+;; closed so the secret-bearing `credentials` column can never be added to these responses by accident
+(def ^:private EnrolledUsersResponse
+  (-> (into [:map {:closed true}]
+            admin-mfa-user-entries)
+      (conj [:enrolled_at [:maybe ms/TemporalInstant]])
+      paged-schema))
+
+(def ^:private UnenrolledUsersResponse
+  (paged-schema (into [:map {:closed true}] admin-mfa-user-entries)))
+
+;; `limit`/`offset` are deliberately absent from the query-param schemas below:
+;; [[metabase.server.middleware.offset-paging]] strips them from :params and exposes them through
+;; `request/limit` and `request/offset` instead.
+
+(api.macros/defendpoint :get "/admin/enrolled-users" :- EnrolledUsersResponse
+  "Admin: users who have a confirmed second factor. Never feature-gated, for the same reason
+  `/admin/remove` isn't — after a licence lapse an admin must still be able to find and unlock a
+  locked-out user.
+
+  Takes `limit`/`offset` for pagination, and `query` to search on first name, last name, and email."
+  [_route-params
+   {:keys [query]} :- [:map [:query {:optional true} [:maybe :string]]]]
+  (api/check-superuser)
+  (user-list-response enrolled-user-where enrolled-at-select query))
+
+(api.macros/defendpoint :get "/admin/unenrolled-users" :- UnenrolledUsersResponse
+  "Admin: active users who have not set up a second factor. Matches `unenrolled_count` from
+  `/admin/overview`, so people who sign in through SSO are included even though the login gate never
+  challenges them — their identity provider owns MFA. Never feature-gated, as above.
+
+  Takes `limit`/`offset` for pagination, and `query` to search on first name, last name, and email."
+  [_route-params
+   {:keys [query]} :- [:map [:query {:optional true} [:maybe :string]]]]
+  (api/check-superuser)
+  (user-list-response unenrolled-user-where nil query))
 
 ;;; -------------------------------------------------- Recovery codes --------------------------------------------------
 

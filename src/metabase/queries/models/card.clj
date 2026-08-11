@@ -82,7 +82,7 @@
 
   The core `after-select` logic compares each row's `card_schema` and runs the upgrade functions for all versions up to
   and including [[current-schema-version]]."
-  23)
+  24)
 
 (defmulti ^:private upgrade-card-schema-to
   "Upgrades a card on read, so that it fits the given schema version number.
@@ -109,6 +109,12 @@
     (t2/update! :model/Card metric-id
                 {:dimensions         dimensions
                  :dimension_mappings dimension-mappings})))
+
+(defmethod metrics/dimensions-initialized? :metadata/metric
+  [metric]
+  (some? (:dimensions (t2/query-one {:select [:dimensions]
+                                     :from   [:report_card]
+                                     :where  [:= :id (:id metric)]}))))
 
 (t2/deftransforms :model/Card
   {:dataset_query          lib-be/transform-query
@@ -150,6 +156,18 @@
   "Returns true if `card` is a model."
   [card]
   (= (keyword (:type card)) :model))
+
+(defn visible-metric-cards-where-clause
+  "HoneySQL `:where` clause selecting non-archived metric Cards that the current user
+   can read (collection visibility applied). Use with `t2/select` / `t2/count` against
+   `:model/Card`."
+  []
+  [:and
+   [:= :type "metric"]
+   [:= :archived false]
+   (collection/visible-collection-filter-clause :collection_id {:include-trash-collection? false
+                                                                :include-archived-items    :exclude
+                                                                :permission-level          :read})])
 
 ;;; -------------------------------------------------- Hydration --------------------------------------------------
 
@@ -245,16 +263,20 @@
         source-card-ids              (into #{}
                                            (keep (comp source-card-id :dataset_query))
                                            cards-with-non-empty-queries)]
-    ;; Prefetching code should not propagate any exceptions.
-    (when (lib-be/metadata-provider-cache)
-      (try
-        (prefetch-tables-for-cards! cards-with-non-empty-queries)
-        (catch Throwable t
-          (log/errorf t "Failed prefetching cards `%s`." (pr-str (map :id cards-with-non-empty-queries))))))
+    ;; Warming caches must not change the outcome of the permission checks below, so nothing here propagates: finding
+    ;; a query's tables means walking it, and a malformed one throws.
+    (try
+      (when (lib-be/metadata-provider-cache)
+        (prefetch-tables-for-cards! cards-with-non-empty-queries))
+      ;; Only the tables the queries name directly: a source Card is reached through its collection's permissions,
+      ;; not its tables', so it contributes none of its own.
+      (perms/prime-table-perms-cache
+       {:table-ids (into #{} (mapcat card->integer-table-ids) cards-with-non-empty-queries)})
+      (catch Throwable t
+        (log/errorf "Failed prefetching cards `%s`: %s" (pr-str (map :id cards-with-non-empty-queries)) (ex-message t))))
     (query-perms/with-card-instances (when (seq source-card-ids)
                                        (t2/select-fn->fn :id identity [:model/Card :id :collection_id :card_schema]
                                                          :id [:in source-card-ids]))
-      (perms/prime-db-cache (into #{} (map :database_id cards)))
       (mi/instances-with-hydrated-data
        cards :can_run_adhoc_query
        (fn []
@@ -344,25 +366,35 @@
 
 (mu/defn populate-query-fields
   "Lift `database_id`, `table_id`, `query_type`, and `source_card_id` fields
-  from query definition when inserting/updating a Card."
-  [{query :dataset_query, :as card} :- ::queries.schema/card]
-  (merge
-   card
-   (when (and (seq query) (map? query))
-     (merge
-      ;; This used to be conditional on not nilling source-card-id, changed due to #68080.
-      {:source_card_id (source-card-id query)}
-      (when-let [{:keys [database-id table-id]} (query/query->database-and-table-ids query)]
-        ;; TODO -- not sure `query_type` is actually used for anything important anyway
-        (let [query-type (if (query/query-is-native? query)
-                           :native
-                           :query)]
-          (merge
-           {:query_type (keyword query-type)}
-           (when database-id
-             {:database_id database-id})
-           (when table-id
-             {:table_id table-id}))))))))
+  from query definition when inserting/updating a Card.
+
+  `clear-stale-table-id?` (default true) controls whether a nil derived table id overwrites an existing `:table_id`.
+  Pass false when the query itself is not changing, so that an unrelated update (rename, archive, ...) doesn't wipe
+  a previously-valid table_id just because the derivation can no longer resolve it (e.g. the source card was
+  deleted)."
+  ([card]
+   (populate-query-fields card true))
+  ([{query :dataset_query, :as card} :- ::queries.schema/card
+    clear-stale-table-id? :- :boolean]
+   (merge
+    card
+    (when (and (seq query) (map? query))
+      (merge
+       ;; This used to be conditional on not nilling source-card-id, changed due to #68080.
+       {:source_card_id (source-card-id query)}
+       (when-let [{:keys [database-id table-id]} (query/query->database-and-table-ids query)]
+         ;; TODO -- not sure `query_type` is actually used for anything important anyway
+         (let [query-type (if (query/query-is-native? query)
+                            :native
+                            :query)]
+           (merge
+            {:query_type (keyword query-type)}
+            ;; a stale table_id gets cleared when the query no longer has a source table (e.g. it was converted to
+            ;; native SQL), same as :source_card_id above
+            (when (or table-id clear-stale-table-id?)
+              {:table_id table-id})
+            (when database-id
+              {:database_id database-id})))))))))
 
 ;;; TODO -- move this to [[metabase.query-processor.card]] or Lib so the logic can be shared between the backend and
 ;;; frontend (?)
@@ -714,6 +746,23 @@
   ;; just a no-op.
   card)
 
+;; Schema upgrade: 23 to 24 ==========================================================================================
+;; Curated metric dimensions. New metrics seed their own-table columns only, with joined/FK
+;; columns available to add on demand. But metrics created before curated dimensions shipped implicitly
+;; exposed EVERY breakoutable column (own-table + implicitly-joined), and existing dashboard filters may
+;; be mapped to those joined columns. Modernize such a metric on read by backfilling the full
+;; implicitly-joined dimension set, so every existing mapping still corresponds to a live dimension.
+;; Only un-curated metrics (`:dimensions` still nil) are touched; once a metric is curated (any write),
+;; its `card_schema` is bumped to current and this upgrade no longer runs, so removals stay sticky.
+(defmethod upgrade-card-schema-to 24
+  [card _schema-version]
+  (if (and (= :metric (keyword (:type card)))
+           (nil? (:dimensions card))
+           (seq (:dataset_query card)))
+    (let [{:keys [dimensions dimension-mappings]} (metrics/compute-full-dimension-set (:dataset_query card))]
+      (assoc card :dimensions dimensions :dimension_mappings dimension-mappings))
+    card))
+
 (mu/defn- upgrade-card-schema-to-latest :- ::queries.schema/card
   [card :- :map]
   (-> (if (and (:id card)
@@ -752,20 +801,17 @@
   Always returns `card`."
   [card]
   (when (= (:dataset_query card) {})
-    (log/infof "Card %d has a blank :dataset_query - this indicates a Metabase issue. Legacy MBQL: %s"
-               (:id card) (:legacy_query card))
+    (log/infof "Card %d has a blank :dataset_query - this indicates a Metabase issue."
+               (:id card))
     (let [uniques (swap! unique-cards-with-blank-dataset-query conj (:id card))]
       (analytics/set-gauge! :metabase-card/unique-cards-failed-conversion (count uniques))))
   ;; Always returns the original card.
   card)
 
-(defn- mbql5-conversion-clean-callback [untransformed-card pre-cleaning-query post-cleaning-query]
+(defn- mbql5-conversion-clean-callback [untransformed-card _pre-cleaning-query _post-cleaning-query]
   (analytics/inc! :metabase-card/conversions-requiring-cleaning)
-  (log/infof "MBQL 4->5 conversion for Card %d had real 'clean' changes from %s into %s; :legacy_query is %s"
-             (:id untransformed-card)
-             (pr-str (dissoc pre-cleaning-query :lib/metadata))
-             (pr-str (dissoc post-cleaning-query :lib/metadata))
-             (:legacy_query untransformed-card)))
+  (log/infof "MBQL 4->5 conversion for Card %d had real 'clean' changes"
+             (:id untransformed-card)))
 
 ;; Uses [[lib/with-card-clean-hook]] to bind a callback which logs the impact of the cleaning process during
 ;; `transform-out`, so that we can log whenever a card gets converted and [[lib.convert/clean]] makes material
@@ -842,6 +888,19 @@
         (card.metadata/populate-result-metadata changes))
       (m/update-existing :result_metadata #(some->> % (lib/normalize [:sequential ::lib.schema.metadata/lib-or-legacy-column])))))
 
+(defn- clear-metabot-origin
+  "A card edited after being saved from a Metabot conversation no longer materializes
+  the chart it was saved from, so sever the link back to its origin — the conversation
+  then stops showing that chart as saved. Only content edits count (query, display, viz
+  settings); renames, moves, and archiving keep the link. The Metabot save paths stamp
+  these columns with raw table updates, so stamping never re-enters this hook."
+  [card changes]
+  (if (and (some (partial contains? changes)
+                 [:dataset_query :display :visualization_settings])
+           (or (:metabot_conversation_id card) (:metabot_chart_id card)))
+    (assoc card :metabot_conversation_id nil :metabot_chart_id nil)
+    card))
+
 (t2/define-before-update :model/Card
   [{:keys [verified-result-metadata?] :as card}]
   (let [changes (some-> card t2/changes queries.schema/normalize-card)
@@ -853,8 +912,10 @@
         (apply-dashboard-question-updates changes)
         (m/update-existing :dataset_query lib-be/normalize-query)
         (populate-result-metadata changes verified-result-metadata?)
-        ;; populate-query-fields must run before pre-update in case source_card_id should be nilled
-        populate-query-fields
+        ;; populate-query-fields must run before pre-update in case source_card_id should be nilled.
+        ;; Only allow it to nil out a stale table_id when the query itself is changing.
+        (populate-query-fields (contains? changes :dataset_query))
+        (clear-metabot-origin changes)
         (pre-update changes)
         maybe-populate-initially-published-at)))
 
@@ -876,10 +937,6 @@
                                                                         :from   [:notification_card]
                                                                         :where  [:= :card_id id]}]))]
     (t2/delete! :model/Notification :id [:in notification-ids])))
-
-(defmethod serdes/hash-fields :model/Card
-  [_card]
-  [:name (serdes/hydrated-hash :collection) :created_at])
 
 (defmethod mi/exclude-internal-content-hsql :model/Card
   [_model & {:keys [table-alias]}]
@@ -1260,10 +1317,7 @@
     (try
       (update-associated-parameters! card-before-update card-updates)
       (catch Throwable e
-        (log/error e "Update of dependent card parameters failed!")
-        (log/debug e
-                   "`card-before-update`:" (pr-str card-before-update)
-                   "`card-updates`:" (pr-str card-updates))))
+        (log/errorf "Update of dependent card parameters failed!: %s" (ex-message e))))
     (collection/check-for-remote-sync-update card-before-update))
   ;; Fetch the updated Card from the DB
   (let [card (t2/select-one :model/Card :id (:id card-before-update))]
@@ -1352,10 +1406,10 @@
           ;; FIXME: remove that `if` after v52
           (m/update-existing :fk_target_field_id #(if (number? %) % (serdes/*import-field-fk* %)))))))
 
-(defn- result-metadata-deps [metadata]
+(defn- result-metadata-deps [allow-int-ids? metadata]
   (when (seq metadata)
     (-> (reduce into #{} (for [m metadata]
-                           (serdes/mbql-deps (:field_ref m))))
+                           (serdes/mbql-deps allow-int-ids? (:field_ref m))))
         (disj nil))))
 
 (defmethod serdes/storage-path "Card" [card ctx]
@@ -1391,14 +1445,14 @@
           :dataset_query_metrics_v2_migration_backup
           ;; this column is not used anymore
           :cache_ttl
-          ;; dimensions are computed from the query and reconciled on read, not serialized
-          :dimensions :dimension_mappings
           ;; temporary column to power rollback from v57 to v56; we can remove it in v58
           :legacy_query
           ;; always derivable from dataset_query by populate-query-fields; nil when not derivable
           :query_type
           ;; always re-derived from dataset_query by populate-query-fields on import
-          :table_id :source_card_id]
+          :table_id :source_card_id
+          ;; instance-specific Metabot origin (which conversation/chart the card was saved from)
+          :metabot_conversation_id :metabot_chart_id]
    :transform
    {:created_at             (serdes/date)
     ;; database_id is usually derivable from dataset_query, but must be kept when the query
@@ -1421,30 +1475,38 @@
     :parameters             {:export serdes/export-parameters :import serdes/import-parameters}
     :parameter_mappings     {:export serdes/export-parameter-mappings :import serdes/import-parameter-mappings}
     :visualization_settings {:export serdes/export-visualization-settings :import serdes/import-visualization-settings}
-    :result_metadata        {:export-with-context export-result-metadata :import import-result-metadata}}
+    :result_metadata        {:export-with-context export-result-metadata :import import-result-metadata}
+    ;; curated metric v2 dimensions & their column mappings; nil for non-metric cards, which elides the keys
+    :dimensions             {:export metrics/export-dimensions :import metrics/import-dimensions}
+    :dimension_mappings     {:export metrics/export-dimension-mappings :import metrics/import-dimension-mappings}}
    :defaults {:archived            false
               :archived_directly   false
               :collection_preview  true
               :enable_embedding    false}})
 
-(defmethod serdes/dependencies "Card"
-  [{:keys [collection_id database_id dataset_query parameters parameter_mappings
-           result_metadata source_card_id visualization_settings
-           dashboard_id document_id]}]
+(defn- card-deps
+  "The serdes dependencies of a Card as `:serdes/meta` paths. `allow-int-ids?` selects raw-appdb vs serialized ref semantics for
+  the mbql walkers. Shared by [[serdes/deserialization-dependencies]] (allow-int-ids? false) and
+  [[serdes/serialization-dependencies]] (allow-int-ids? true)."
+  [allow-int-ids? {:keys [collection_id database_id dataset_query dimension_mappings parameters parameter_mappings
+                          result_metadata source_card_id visualization_settings
+                          dashboard_id document_id]}]
   (set
    (concat
-    (mapcat serdes/mbql-deps parameter_mappings)
-    (serdes/parameters-deps parameters)
+    (mapcat #(serdes/mbql-deps allow-int-ids? %) parameter_mappings)
+    (metrics/dimension-mappings-deps allow-int-ids? dimension_mappings)
+    (serdes/parameters-deps allow-int-ids? parameters)
     (when database_id [[{:model "Database" :id database_id}]])
-    ;; Note: `table_id` is intentionally not a dependency — the Database (above) is, and a missing Table is
-    ;; synthesized as an inactive row on import.
     (when source_card_id #{[{:model "Card" :id source_card_id}]})
     (when collection_id #{[{:model "Collection" :id collection_id}]})
     (when dashboard_id #{[{:model "Dashboard" :id dashboard_id}]})
     (when document_id #{[{:model "Document" :id document_id}]})
-    (result-metadata-deps result_metadata)
-    (serdes/mbql-deps dataset_query)
-    (serdes/visualization-settings-deps visualization_settings))))
+    (result-metadata-deps allow-int-ids? result_metadata)
+    (serdes/mbql-deps allow-int-ids? dataset_query)
+    (serdes/visualization-settings-deps allow-int-ids? visualization_settings))))
+
+(defmethod serdes/deserialization-dependencies "Card" [card]
+  (card-deps false card))
 
 (defmethod serdes/descendants "Card" [_model-name id _opts]
   (let [card               (t2/select-one :model/Card :id id)
@@ -1463,6 +1525,9 @@
                 {["Card" card-id] {"Card" id}})
               (for [snippet-id snippets]
                 {["NativeQuerySnippet" snippet-id] {"Card" id}})))))
+
+(defmethod serdes/serialization-dependencies "Card" [_model-name card]
+  (card-deps true card))
 
 ;;;; ------------------------------------------------- Search ----------------------------------------------------------
 

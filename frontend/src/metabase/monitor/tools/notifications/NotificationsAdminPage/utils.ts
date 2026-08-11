@@ -30,7 +30,11 @@ import {
   TAB_FILTERS,
   TAB_VALUES,
 } from "./constants";
-import type { NotificationsTab, NotificationsUrlState } from "./types";
+import type {
+  NotificationsTab,
+  NotificationsUrlState,
+  TabCountState,
+} from "./types";
 
 const parsePage = (param: QueryParam): number => {
   const value = getFirstParamValue(param);
@@ -83,6 +87,7 @@ const parseGuardedEnum = <T extends string, D extends T | null>(
 
 const guardChannel = (value: string): value is NotificationChannelType =>
   (CHANNEL_VALUES satisfies NotificationChannelType[]).includes(
+    // Unjustified type cast. FIXME
     value as NotificationChannelType,
   );
 
@@ -91,6 +96,7 @@ const parseChannels = (param: QueryParam): NotificationChannelType[] =>
 
 const guardLastSendStatus = (value: string): value is NotificationRunStatus =>
   (LAST_SEND_STATUS_VALUES satisfies NotificationRunStatus[]).includes(
+    // Unjustified type cast. FIXME
     value as NotificationRunStatus,
   );
 
@@ -111,6 +117,7 @@ const parseCreatorActive = (param: QueryParam): boolean | null => {
 };
 
 const guardTab = (value: string): value is NotificationsTab =>
+  // Unjustified type cast. FIXME
   (TAB_VALUES satisfies NotificationsTab[]).includes(value as NotificationsTab);
 
 const parseTabEnum = (param: QueryParam): NotificationsTab =>
@@ -118,6 +125,7 @@ const parseTabEnum = (param: QueryParam): NotificationsTab =>
 
 const guardSortColumn = (value: string): value is AdminNotificationSortColumn =>
   (SORT_COLUMN_VALUES satisfies AdminNotificationSortColumn[]).includes(
+    // Unjustified type cast. FIXME
     value as AdminNotificationSortColumn,
   );
 
@@ -193,6 +201,20 @@ export const buildListParams = (
     sort_column: state.sort_column,
     sort_direction: state.sort_direction,
   };
+};
+
+export const getTabCount = (
+  isLoading: boolean,
+  error: unknown,
+  value: number,
+): TabCountState => {
+  if (isLoading) {
+    return { status: "loading" };
+  }
+  if (error !== undefined) {
+    return { status: "error" };
+  }
+  return { status: "loaded", value };
 };
 
 export const getChannelLabel = (channel: NotificationChannelType): string =>

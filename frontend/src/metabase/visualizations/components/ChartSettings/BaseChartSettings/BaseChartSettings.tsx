@@ -226,6 +226,7 @@ export const BaseChartSettings = ({
         </ChartSettingsListContainer>
       </Stack>
       <ChartSettingsWidgetPopover
+        // Unjustified type cast. FIXME
         anchor={popoverRef as HTMLElement}
         widgets={[styleWidget, formattingWidget].filter(
           (widget): widget is Widget => !!widget,

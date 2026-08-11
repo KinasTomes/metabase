@@ -250,6 +250,7 @@ const PivotTableInner = forwardRef<HTMLDivElement, VisualizationProps>(
       let newColumnWidths: Partial<HeaderWidthType> = {};
 
       if (columnType === "leftHeader") {
+        // Unjustified type cast. FIXME
         const newLeftHeaderColumnWidths = [...(leftHeaderWidths as number[])];
         newLeftHeaderColumnWidths[columnIndex] = Math.max(
           newWidth,
@@ -347,23 +348,27 @@ const PivotTableInner = forwardRef<HTMLDivElement, VisualizationProps>(
       }
 
       // The CLJS code adds `colIdx` to the objects used for click handling instead of the entire column
-      // to avoid duplicate column metadata conversions from CLJS data structures to JS objects
+      // to avoid duplicate column metadata conversions from CLJS data structures to JS objects.
+      // A value-cell click carries a top-level `colIdx` (identifying the aggregation column) AND
+      // a pre-built `data` array, so column-setting and data-enrichment must be independent (#79023).
       const { colIdx, ...updatedClicked } = clicked;
       if (typeof colIdx === "number") {
         updatedClicked.column = columnsWithoutPivotGroup[colIdx];
-        updatedClicked.data ??= [
-          {
-            value: updatedClicked.value,
-            col: columnsWithoutPivotGroup[colIdx] || null,
-          },
-        ];
-      } else if (updatedClicked.data) {
+      }
+      if (updatedClicked.data) {
         updatedClicked.data = updatedClicked.data.map(
           ({ colIdx, ...item }) => ({
             ...item,
             col: colIdx !== undefined ? columnsWithoutPivotGroup[colIdx] : null,
           }),
         );
+      } else if (typeof colIdx === "number") {
+        updatedClicked.data = [
+          {
+            value: updatedClicked.value,
+            col: columnsWithoutPivotGroup[colIdx] || null,
+          },
+        ];
       }
 
       if (updatedClicked.dimensions) {
@@ -473,6 +478,7 @@ const PivotTableInner = forwardRef<HTMLDivElement, VisualizationProps>(
                       )
                     }
                     onScroll={({ scrollLeft }) =>
+                      // Unjustified type cast. FIXME
                       onScroll({ scrollLeft } as OnScrollParams)
                     }
                     scrollLeft={scrollLeft}
@@ -511,6 +517,7 @@ const PivotTableInner = forwardRef<HTMLDivElement, VisualizationProps>(
                           height={bodyHeight - scrollBarOffsetSize()}
                           scrollTop={scrollTop}
                           onScroll={({ scrollTop }) =>
+                            // Unjustified type cast. FIXME
                             onScroll({ scrollTop } as OnScrollParams)
                           }
                         />
@@ -563,6 +570,7 @@ const PivotTableInner = forwardRef<HTMLDivElement, VisualizationProps>(
                             );
                           }}
                           onScroll={({ scrollLeft, scrollTop }) =>
+                            // Unjustified type cast. FIXME
                             onScroll({
                               scrollLeft,
                               scrollTop,

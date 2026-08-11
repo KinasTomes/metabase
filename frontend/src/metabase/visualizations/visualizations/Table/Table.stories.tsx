@@ -33,6 +33,7 @@ const storeInitialState = createMockState({
   settings,
   entities: createMockEntitiesState({}),
 });
+// Unjustified type cast. FIXME
 const store = getCommonStore(storeInitialState) as unknown as Store<State>;
 
 export default {

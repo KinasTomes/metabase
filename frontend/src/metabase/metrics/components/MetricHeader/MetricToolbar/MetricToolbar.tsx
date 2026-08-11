@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { push } from "react-router-redux";
 import { c, t } from "ttag";
 
 import {
@@ -23,6 +22,7 @@ import { CardCopyModal } from "metabase/questions/components/CardCopyModal";
 import { MoveCardModal } from "metabase/questions/components/MoveCardModal";
 import { useDispatch, useSelector } from "metabase/redux";
 import { openUrl } from "metabase/redux/app";
+import { useNavigate } from "metabase/router";
 import { getMetadata } from "metabase/selectors/metadata";
 import { canManageSubscriptions as canManageSubscriptionsSelector } from "metabase/selectors/user";
 import { ActionIcon, Icon, Menu } from "metabase/ui";
@@ -233,10 +233,10 @@ interface MetricModalProps {
 }
 
 function MetricModal({ card, urls, modalType, onClose }: MetricModalProps) {
-  const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   const handleCopy = (newCard: Card) => {
-    dispatch(push(urls.about(newCard.id)));
+    navigate(urls.about(newCard.id));
   };
 
   switch (modalType) {
@@ -253,7 +253,7 @@ function MetricModal({ card, urls, modalType, onClose }: MetricModalProps) {
         <AddToDashSelectDashModal
           card={card}
           onClose={onClose}
-          onChangeLocation={(location) => dispatch(push(location))}
+          onChangeLocation={(location) => navigate(location)}
         />
       );
     case "alert":

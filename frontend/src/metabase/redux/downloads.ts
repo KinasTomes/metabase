@@ -14,7 +14,7 @@ import { waitUntilNextFramePainted } from "metabase/common/utils/wait-until-next
 import { isEmbeddingSdk } from "metabase/embedding-sdk/config";
 import type { DownloadsState, State } from "metabase/redux/store";
 import { createAsyncThunk } from "metabase/redux/utils";
-import { getTokenFeature } from "metabase/selectors/settings";
+import { getTokenFeature } from "metabase/settings";
 import * as Urls from "metabase/urls";
 import { getBasename } from "metabase/utils/basename";
 import { openSaveDialog } from "metabase/utils/dom";
@@ -363,6 +363,7 @@ const convertSearchParamsToObject = (params: URLSearchParams) => {
   const object: Record<string, string | string[]> = {};
   for (const [key, value] of params.entries()) {
     if (object[key]) {
+      // Unjustified type cast. FIXME
       object[key] = ([] as string[]).concat(object[key], value);
     } else {
       object[key] = value;

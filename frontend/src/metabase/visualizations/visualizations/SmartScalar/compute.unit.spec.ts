@@ -1228,6 +1228,7 @@ describe("SmartScalar > compute", () => {
               // type casting is required for invalid values testing
               {
                 id: "1",
+                // Unjustified type cast. FIXME
                 type: type as SmartScalarComparisonType,
               } as SmartScalarComparison,
             ],

@@ -1,9 +1,7 @@
 import { unifiedMergeView } from "@codemirror/merge";
 import { useDisclosure } from "@mantine/hooks";
-import type { UnknownAction } from "@reduxjs/toolkit";
 import cx from "classnames";
 import { useContext, useMemo, useState } from "react";
-import { push } from "react-router-redux";
 import { useLocation, useMount } from "react-use";
 import { P, match } from "ts-pattern";
 import { t } from "ttag";
@@ -21,6 +19,7 @@ import {
 import { useMetadataToasts } from "metabase/metadata/hooks";
 import EditorS from "metabase/querying/components/CodeMirrorEditor/CodeMirrorEditor.module.css";
 import { useDispatch, useSelector } from "metabase/redux";
+import { useNavigate } from "metabase/router";
 import { getMetadata } from "metabase/selectors/metadata";
 import {
   Button,
@@ -45,7 +44,7 @@ import type {
 import S from "./MetabotAgentSuggestionMessage.module.css";
 
 export type SuggestionMessage = Omit<MetabotAgentDataPartMessage, "part"> & {
-  part: Extract<MetabotDataPart, { type: "transform_suggestion" }>;
+  part: Extract<MetabotDataPart, { type: "data-transform_suggestion" }>;
 };
 
 const PreviewContent = ({
@@ -119,6 +118,7 @@ export const AgentSuggestionMessage = ({
   readonly?: boolean;
 }) => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const metadata = useSelector(getMetadata);
   const { suggestionActions } = useContext(MetabotContext);
   const { sendErrorToast } = useMetadataToasts();
@@ -126,7 +126,7 @@ export const AgentSuggestionMessage = ({
   const [hasAppliedInContext, setHasAppliedInContext] = useState(false);
 
   const suggestedTransform: MetabotSuggestedTransform = {
-    ...message.part.value,
+    ...message.part.data,
     active: true,
     suggestionId: message.metadata?.suggestionId ?? message.id,
   };
@@ -190,7 +190,7 @@ export const AgentSuggestionMessage = ({
       return;
     }
 
-    dispatch(push(getTransformUrl(suggestedTransform)) as UnknownAction);
+    navigate(getTransformUrl(suggestedTransform));
   };
 
   return (

@@ -3,6 +3,7 @@ import _ from "underscore";
 import { loadMetadataForCard } from "metabase/questions/actions";
 import { createThunkAction } from "metabase/redux";
 import {
+  UPDATE_QUESTION,
   onCloseQuestionInfo,
   setUIControls,
 } from "metabase/redux/query-builder";
@@ -51,12 +52,14 @@ function shouldTemplateTagEditorBeVisible({
   ).isNative;
 
   const previousTags = isCurrentQuestionNative
-    ? (
+    ? // Unjustified type cast. FIXME
+      (
         currentQuestion.legacyNativeQuery() as NativeQuery
       ).variableTemplateTags()
     : [];
   const nextTags = isNewQuestionNative
-    ? (newQuestion.legacyNativeQuery() as NativeQuery).variableTemplateTags()
+    ? // Unjustified type cast. FIXME
+      (newQuestion.legacyNativeQuery() as NativeQuery).variableTemplateTags()
     : [];
   if (nextTags.length > previousTags.length) {
     return true;
@@ -75,7 +78,6 @@ export type UpdateQuestionOpts = {
 /**
  * Replaces the currently active question with the given Question object.
  */
-export const UPDATE_QUESTION = "metabase/qb/UPDATE_QUESTION";
 export const updateQuestion = (
   newQuestion: Question,
   {

@@ -7,7 +7,7 @@ import type { GlossaryItem } from "metabase/api";
 import { ConfirmModal } from "metabase/common/components/ConfirmModal";
 import { Table as CommonTable } from "metabase/common/components/Table/Table";
 import { NoObjectError } from "metabase/common/components/errors/NoObjectError";
-import { useMetabotName } from "metabase/metabot/hooks";
+import { useSetting } from "metabase/settings";
 import {
   ActionIcon,
   Box,
@@ -46,7 +46,7 @@ export function GlossaryTable({
   onDelete,
 }: GlossaryTableProps) {
   const [isCreating, setIsCreating] = useState(false);
-  const metabotName = useMetabotName();
+  const metabotName = useSetting("metabot-name");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingField, setEditingField] = useState<GlossaryField | null>(null);
   const [deletingItem, setDeletingItem] = useState<GlossaryItem | null>(null);
@@ -134,6 +134,7 @@ export function GlossaryTable({
         sortColumnName={sortColumnName}
         sortDirection={sortDirection}
         onSort={(column, dir) => {
+          // Unjustified type cast. FIXME
           setSortColumnName(column as keyof GlossaryItem);
           setSortDirection(dir);
         }}
@@ -156,6 +157,7 @@ export function GlossaryTable({
             );
           }
 
+          // Unjustified type cast. FIXME
           const item = row as GlossaryItem;
           const isEditing = editingId === item.id;
 

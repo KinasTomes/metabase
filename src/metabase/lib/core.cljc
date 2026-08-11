@@ -119,6 +119,7 @@
    [metabase.lib.table :as lib.table]
    [metabase.lib.template-tags :as lib.template-tags]
    [metabase.lib.temporal-bucket :as lib.temporal-bucket]
+   [metabase.lib.underlying :as lib.underlying]
    [metabase.lib.util :as lib.util]
    [metabase.lib.util.unique-name-generator]
    [metabase.lib.validate :as lib.validate]
@@ -1422,7 +1423,6 @@
   ->legacy-MBQL
   ->mbql5
   legacy-default-join-alias
-  with-aggregation-list
   without-cleaning]
  [metabase.lib.convert.metadata-to-legacy
   lib-metadata-column->legacy-metadata-column
@@ -1623,6 +1623,8 @@
   raw-temporal-bucket
   temporal-bucket
   with-temporal-bucket]
+ [lib.underlying
+  aggregation-sourced?]
  [lib.util
   clause?
   clause-of-type?
@@ -1668,6 +1670,8 @@
   any-native-stage-not-introduced-by-sandbox?
   replace-field-ids
   replace-table-ids])
+
+(shared.ns/import-macro lib.convert/with-aggregation-list)
 
 #?(:clj
    (defmacro with-card-clean-hook

@@ -1,6 +1,7 @@
 import { createMockEntitiesState } from "__support__/store";
 import * as questionActions from "metabase/questions/actions";
 import * as sharedQB from "metabase/redux/query-builder";
+import { UPDATE_QUESTION } from "metabase/redux/query-builder";
 import type { QueryBuilderMode } from "metabase/redux/store";
 import {
   createMockQueryBuilderState,
@@ -56,7 +57,7 @@ import * as ui from "../ui";
 import * as url from "../url";
 
 import * as native from "./native";
-import { UPDATE_QUESTION, updateQuestion } from "./updateQuestion";
+import { updateQuestion } from "./updateQuestion";
 
 registerVisualizations();
 
@@ -120,6 +121,7 @@ async function setup({
   shouldStartAdHocQuestion,
 }: SetupOpts) {
   const isSavedCard = "id" in card;
+  // Unjustified type cast. FIXME
   const isModel = (card as Card).type === "model";
 
   const dispatch = jest.fn().mockReturnValue({ mock: "mock" });
@@ -131,6 +133,7 @@ async function setup({
 
   const entitiesState = createMockEntitiesState({
     databases: [createSampleDatabase(), SAVED_QUESTIONS_DB],
+    // Unjustified type cast. FIXME
     tables: isModel ? [getModelVirtualTable(card as Card)] : [],
     questions: cards,
   });
@@ -591,6 +594,7 @@ describe("QB Actions > updateQuestion", () => {
 
           await setup({
             card: cardWithJoin,
+            // Unjustified type cast. FIXME
             originalCard: originalCard as Card,
           });
 
@@ -676,6 +680,7 @@ describe("QB Actions > updateQuestion", () => {
         ...opts,
         card: cardWithTags,
         originalCard,
+        // Unjustified type cast. FIXME
         queryBuilderMode: (card as Card).type === "model" ? "dataset" : "view",
       });
 

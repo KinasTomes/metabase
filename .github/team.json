@@ -64,7 +64,9 @@
         "lbrdnk",
         "piranha",
         "crisptrutski",
-        "undrfined"
+        "undrfined",
+        "andreis",
+        "prascuna"
       ]
     },
     {
@@ -93,7 +95,8 @@
         "deniskaber",
         "andsalves",
         "kevinkelleher12",
-        "AndreyChernykh"
+        "AndreyChernykh",
+        "bowbahdoe"
       ]
     },
     {
@@ -122,6 +125,13 @@
         "gantoreno",
         "losrebellos",
         "tmashara"
+      ]
+    },
+    {
+      "name": "Security Engineering",
+      "label": ".Team/SecurityEngineering",
+      "members": [
+        "enthym-aa"
       ]
     }
   ]

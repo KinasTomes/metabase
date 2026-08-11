@@ -29,6 +29,7 @@ import {
 } from "metabase/visualizations/echarts/cartesian/constants/dataset";
 import {
   isBreakoutSeries,
+  isNumericAxis,
   isQuarterInterval,
   isTimeSeriesAxis,
 } from "metabase/visualizations/echarts/cartesian/model/guards";
@@ -44,11 +45,11 @@ import type {
   SeriesModel,
   StackModel,
 } from "metabase/visualizations/echarts/cartesian/model/types";
-import type { TimelineEventsModel } from "metabase/visualizations/echarts/cartesian/timeline-events/types";
 import { getMarkerColorClass } from "metabase/visualizations/echarts/tooltip";
-import type {
-  EChartsSeriesBrushEndEvent,
-  EChartsSeriesMouseEvent,
+import {
+  type EChartsSeriesBrushEndEvent,
+  type EChartsSeriesMouseEvent,
+  isLineXBrushRange,
 } from "metabase/visualizations/echarts/types";
 import { computeChange } from "metabase/visualizations/lib/numeric";
 import {
@@ -59,21 +60,26 @@ import { dimensionIsTimeseries } from "metabase/visualizations/lib/timeseries";
 import type {
   ComputedVisualizationSettings,
   DataPoint,
+  OnBrush,
   OnChangeCardAndRun,
 } from "metabase/visualizations/types";
-import type { ClickObject, ClickObjectDimension } from "metabase-lib";
+import type {
+  BrushClickObject,
+  BrushRange,
+  ClickObject,
+  ClickObjectDimension,
+} from "metabase-lib";
 import * as Lib from "metabase-lib";
 import Question from "metabase-lib/v1/Question";
 import type Metadata from "metabase-lib/v1/metadata/Metadata";
 import { getColumnKey } from "metabase-lib/v1/queries/utils/column-key";
-import { isDate } from "metabase-lib/v1/types/utils/isa";
+import { isDate, isDateWithoutTime } from "metabase-lib/v1/types/utils/isa";
 import type {
   CardDisplayType,
   CardId,
   DatasetColumn,
   RawSeries,
-  TimelineEvent,
-  TimelineEventId,
+  RowValue,
 } from "metabase-types/api";
 import { isSavedCard } from "metabase-types/guards";
 
@@ -123,6 +129,22 @@ const getSameCardDataKeys = (
   });
 };
 
+export const normalizeDimensionValue = (
+  column: DatasetColumn,
+  value: RowValue,
+): RowValue => {
+  if (!isDate(column) || value == null) {
+    return value;
+  }
+
+  const parsed = parseTimestamp(value);
+  if (!parsed.isValid()) {
+    return value;
+  }
+
+  return parsed.format("YYYY-MM-DDTHH:mm:ss");
+};
+
 export const getEventDimensions = (
   chartModel: BaseCartesianChartModel,
   datum: Datum,
@@ -142,18 +164,9 @@ export const getEventDimensions = (
   const dimensions: ClickObjectDimension[] = [];
 
   if (hasDimensionValue) {
-    let dimensionValue = datum[X_AXIS_DATA_KEY];
-
-    if (isDate(dimensionColumn) && dimensionValue != null) {
-      const parsed = parseTimestamp(dimensionValue);
-      if (parsed.isValid()) {
-        dimensionValue = parsed.format("YYYY-MM-DDTHH:mm:ss");
-      }
-    }
-
     dimensions.push({
       column: dimensionColumn,
-      value: dimensionValue,
+      value: normalizeDimensionValue(dimensionColumn, datum[X_AXIS_DATA_KEY]),
     });
   }
 
@@ -305,7 +318,7 @@ export const canBrush = (
   settings: ComputedVisualizationSettings,
   dimensionColumn: DatasetColumn | undefined,
   onChangeCardAndRun?: OnChangeCardAndRun | null,
-  onBrush?: ((range: { start: number; end: number }) => void) | null,
+  onBrush?: OnBrush | null,
 ) => {
   const hasBrushableDimension =
     settings["graph.x_axis.scale"] != null &&
@@ -507,7 +520,9 @@ const getSingleSeriesTooltipModel = (
   );
 
   const seriesToShow = chartModel.seriesModels.filter(
-    (series) => series === hoveredSeries || !isBreakoutSeries(series),
+    (series) =>
+      series === hoveredSeries ||
+      (!isBreakoutSeries(series) && datum[series.dataKey] !== undefined),
   );
   const seriesTooltipRows = seriesToShow.map((series) => {
     const isFocused =
@@ -868,67 +883,12 @@ export const getOtherSeriesTooltipModel = (
   };
 };
 
-const isMouseEventWithXAxis = (
-  event: EChartsSeriesMouseEvent,
-): event is EChartsSeriesMouseEvent<{ xAxis: string }> => {
-  return (
-    typeof event.data === "object" &&
-    event.data !== null &&
-    "xAxis" in event.data &&
-    typeof event.data.xAxis === "string" &&
-    event.data.xAxis.length > 0
-  );
-};
-
-export const getTimelineEventsForEvent = (
-  timelineEventsModel: TimelineEventsModel,
-  event: EChartsSeriesMouseEvent,
-) => {
-  if (isMouseEventWithXAxis(event)) {
-    return timelineEventsModel.find(
-      (timelineEvents) => timelineEvents.date === event.data.xAxis,
-    )?.events;
-  }
-
-  return timelineEventsModel.find(
-    (timelineEvents) => timelineEvents.date === event.value,
-  )?.events;
-};
-
-export const hasSelectedTimelineEvents = (
-  timelineEvents: TimelineEvent[],
-  selectedTimelineEventIds?: TimelineEventId[],
-) => {
-  return (
-    selectedTimelineEventIds != null &&
-    selectedTimelineEventIds.length > 0 &&
-    timelineEvents.some((timelineEvent) =>
-      selectedTimelineEventIds.includes(timelineEvent.id),
-    )
-  );
-};
-
-export const getTimelineEventsHoverData = (
-  timelineEventsModel: TimelineEventsModel,
-  event: EChartsSeriesMouseEvent,
-) => {
-  const hoveredTimelineEvents = getTimelineEventsForEvent(
-    timelineEventsModel,
-    event,
-  );
-  const element = event.event.event.target as Element;
-
-  return {
-    element: element?.nodeName === "image" ? element : undefined,
-    timelineEvents: hoveredTimelineEvents,
-  };
-};
-
 export const getGoalLineHoverData = (
   settings: ComputedVisualizationSettings,
   event: EChartsSeriesMouseEvent,
   formatGoal?: AxisFormatter,
 ) => {
+  // Unjustified type cast. FIXME
   const element = event.event.event.target as Element;
 
   if (element?.nodeName !== "text") {
@@ -987,6 +947,63 @@ export const getSeriesClickData = (
     column: seriesModel.column,
     data,
     dimensions,
+    settings,
+  };
+};
+
+export const getBrushClickObject = (
+  chartModel: BaseCartesianChartModel,
+  event: EChartsSeriesBrushEndEvent,
+  chartElement: HTMLElement,
+  settings: ComputedVisualizationSettings,
+): BrushClickObject | null => {
+  const area = event.areas[0];
+  const coordRange = area?.coordRange;
+  const pixelRange = area?.range;
+  if (
+    !isLineXBrushRange(coordRange) ||
+    !isLineXBrushRange(pixelRange) ||
+    coordRange.length < 2 ||
+    pixelRange.length < 2
+  ) {
+    return null;
+  }
+
+  const [rawStart, rawEnd] = [
+    Number(coordRange[0]),
+    Number(coordRange[1]),
+  ].sort((a, b) => a - b);
+  const { xAxisModel, dimensionModel } = chartModel;
+  const column = dimensionModel.column;
+
+  let brushRange: BrushRange;
+  if (isTimeSeriesAxis(xAxisModel)) {
+    const dateFormat = isDateWithoutTime(column)
+      ? "YYYY-MM-DD"
+      : "YYYY-MM-DDTHH:mm:ss";
+    brushRange = {
+      type: "temporal",
+      start: xAxisModel.fromEChartsAxisValue(rawStart).format(dateFormat),
+      end: xAxisModel.fromEChartsAxisValue(rawEnd).format(dateFormat),
+    };
+  } else if (isNumericAxis(xAxisModel)) {
+    brushRange = {
+      type: "numeric",
+      start: xAxisModel.fromEChartsAxisValue(rawStart),
+      end: xAxisModel.fromEChartsAxisValue(rawEnd),
+    };
+  } else {
+    return null;
+  }
+
+  const chartBounds = chartElement.getBoundingClientRect();
+  const clientX = chartBounds.left + Math.max(pixelRange[0], pixelRange[1]);
+  const clientY = chartBounds.top + chartBounds.height / 2;
+
+  return {
+    brushRange,
+    column,
+    event: new MouseEvent("click", { clientX, clientY }),
     settings,
   };
 };

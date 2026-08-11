@@ -1,4 +1,3 @@
-import { push } from "react-router-redux";
 import { jt, t } from "ttag";
 
 import { useGetTableSelectionInfoQuery } from "metabase/api";
@@ -13,7 +12,7 @@ import {
 } from "metabase/forms";
 import { useMetadataToasts } from "metabase/metadata/hooks";
 import { PLUGIN_LIBRARY, type PublishTablesModalProps } from "metabase/plugins";
-import { useDispatch } from "metabase/redux";
+import { useNavigate } from "metabase/router";
 import {
   Box,
   Button,
@@ -108,7 +107,7 @@ function ModalBody({
   });
   const [publishTables] = usePublishTablesMutation();
   const { sendSuccessToast } = useMetadataToasts();
-  const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { data: dataCollection, isLoading: isLoadingDataCollection } =
     PLUGIN_LIBRARY.useGetLibraryChildCollectionByType({
       type: "library-data",
@@ -136,7 +135,7 @@ function ModalBody({
     if (collection != null) {
       sendSuccessToast(
         t`Published`,
-        () => dispatch(push(Urls.dataStudioLibrary())),
+        () => navigate(Urls.dataStudioLibrary()),
         t`Go to ${collection.name}`,
       );
     } else {

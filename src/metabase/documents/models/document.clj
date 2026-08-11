@@ -16,7 +16,8 @@
    [metabase.util.log :as log]
    [metabase.util.malli :as mu]
    [methodical.core :as methodical]
-   [toucan2.core :as t2]))
+   [toucan2.core :as t2]
+   [toucan2.instance :as t2.instance]))
 
 (methodical/defmethod t2/table-name :model/Document [_model] :document)
 
@@ -101,7 +102,16 @@
                                    :archived archived
                                    :archived-directly archived_directly)
   (when-not mi/*deserializing?*
-    (events/publish-event! :event/document-update {:object instance}))
+    ;; Toucan2 hands `define-after-update` a `TransientRow` for each updated row,
+    ;; which is *not* a `mi/instance-of? :model/Document`. The revisions handler
+    ;; rejects non-instances with "object must be a model instance" — caught and
+    ;; logged at `revisions/events.clj:30`, but as a result no revision row is
+    ;; recorded for content updates. Promote it to a real instance here so the
+    ;; revisions push can complete cleanly.
+    (events/publish-event! :event/document-update
+                           {:object (if (t2/instance-of? :model/Document instance)
+                                      instance
+                                      (t2.instance/instance :model/Document instance))}))
   instance)
 
 (t2/define-after-select :model/Document
@@ -109,10 +119,6 @@
   (public-sharing/remove-public-uuid-if-public-sharing-is-disabled document))
 
 ;;; ------------------------------------------------ Serdes Hashing -------------------------------------------------
-
-(defmethod serdes/hash-fields :model/Document
-  [_table]
-  [:name (serdes/hydrated-hash :collection) :created-at])
 
 ;;; ----------------------------------------------- Search ----------------------------------------------------------
 
@@ -245,11 +251,29 @@
                                                 :else
                                                 nil))))))
 
-(defmethod serdes/dependencies "Document"
+(defmethod serdes/deserialization-dependencies "Document"
   [{:keys [collection_id] :as document}]
   (set (concat
         (document-deps document)
         (when collection_id #{[{:model "Collection" :id collection_id}]}))))
+
+(defmethod serdes/serialization-dependencies "Document"
+  ;; Embedded cards and smart-links become content references (each must be part of the export); the containing
+  ;; Collection is included too, though a selective export may legitimately omit it.
+  [_model-name {:keys [collection_id content_type] :as document}]
+  (set
+   (concat
+    (when collection_id [[{:model "Collection" :id collection_id}]])
+    (when (= content_type prose-mirror/prose-mirror-content-type)
+      (concat
+       (for [embedded-card-id (prose-mirror/card-ids document)]
+         [{:model "Card" :id embedded-card-id}])
+       (for [{model :model link-id :entityId}
+             (prose-mirror/collect-ast document
+                                       #(when (= prose-mirror/smart-link-type (:type %))
+                                          (:attrs %)))
+             :when (contains? model->serdes-model model)]
+         [{:model (model->serdes-model model) :id link-id}]))))))
 
 (defmethod serdes/descendants "Document"
   [_model-name id _opts]

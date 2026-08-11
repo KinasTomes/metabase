@@ -126,6 +126,7 @@ export function computeTrend(
     };
   } catch (error) {
     return {
+      // Unjustified type cast. FIXME
       error: error as Error,
     };
   }
@@ -278,6 +279,7 @@ function getCurrentMetricData({
   if (latestRowIndex === -1) {
     throw Error("No rows contain a valid value.");
   }
+  // Unjustified type cast. FIXME
   const date = rows[latestRowIndex][dimensionColIndex] as string;
   const value = rows[latestRowIndex][metricColIndex];
 
@@ -454,6 +456,7 @@ function computeComparisonPreviousValue({
     return null;
   }
 
+  // Unjustified type cast. FIXME
   const prevDate = rows[previousRowIndex][dimensionColIndex] as string;
   const prevValue = rows[previousRowIndex][metricColIndex];
 
@@ -554,7 +557,8 @@ function computeComparisonPeriodsAgo({
   };
 
   const prevDate = !isEmpty(rowPeriodsAgo)
-    ? (rowPeriodsAgo?.[dimensionColIndex] as string)
+    ? // Unjustified type cast. FIXME
+      (rowPeriodsAgo?.[dimensionColIndex] as string)
     : computedPrevDate;
   const comparisonDescStr =
     dateUnitsAgo === 1
@@ -614,6 +618,7 @@ function getRowOfPeriodsAgo({
   for (let i = searchIndexStart; i >= searchIndexEnd; i--) {
     const candidateRow = rows[i];
     const candidateDate = dayjs.parseZone(
+      // Unjustified type cast. FIXME
       candidateRow?.[dimensionColIndex] as string | undefined,
     );
     const candidateValue = candidateRow[metricColIndex];

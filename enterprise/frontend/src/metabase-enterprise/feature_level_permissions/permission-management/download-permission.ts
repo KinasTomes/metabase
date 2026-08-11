@@ -1,7 +1,7 @@
-import { push } from "react-router-redux";
 import { t } from "ttag";
 
 import { Messages } from "metabase/admin/permissions/constants/messages";
+import { navigateToGranularPermissions } from "metabase/admin/permissions/permissions";
 import {
   getPermissionWarning,
   getPermissionWarningModal,
@@ -16,7 +16,6 @@ import {
   getSchemasPermission,
   getTablesPermission,
 } from "metabase/admin/permissions/utils/graph";
-import { getGroupFocusPermissionsUrl } from "metabase/admin/permissions/utils/urls";
 import {
   DataPermission,
   DataPermissionValue,
@@ -90,6 +89,7 @@ const getPermissionValue = (
       return getFieldsPermission(
         permissions,
         groupId,
+        // Unjustified type cast. FIXME
         entityId as TableEntityId,
         permission,
       );
@@ -97,6 +97,7 @@ const getPermissionValue = (
       return getTablesPermission(
         permissions,
         groupId,
+        // Unjustified type cast. FIXME
         entityId as SchemaEntityId,
         permission,
       );
@@ -203,8 +204,7 @@ export const buildDownloadPermission = (
     ],
     postActions: hasChildEntities
       ? {
-          controlled: () =>
-            push(getGroupFocusPermissionsUrl(groupId, entityId)),
+          controlled: () => navigateToGranularPermissions(groupId, entityId),
         }
       : undefined,
   };

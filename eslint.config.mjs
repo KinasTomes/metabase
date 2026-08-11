@@ -27,6 +27,7 @@ import metabasePlugin from "./frontend/lint/eslint-plugin-metabase/index.js";
 import {
   elements as boundaryElements,
   enforcedRules as boundaryRules,
+  getPublicApiModules,
 } from "./frontend/lint/module-boundaries.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -35,6 +36,15 @@ const shouldLintCssModules =
   process.env.LINT_CSS_MODULES === "true" || process.env.CI;
 
 const TEST_FILES_NAME_PATTERN_ERROR_MESSAGE = `Please name your test setup and utils files with a ".spec.*" in the filename, or put them under "/tests", e.g. "setup.spec.ts", "MyComponent.setup.spec.ts", or "tests/setup.ts". This is to ensure they won't be imported in the SDK build.`;
+
+// ttag string extraction only understands contexts chained inline, e.g. c("...").t`...`;
+// a c() call stored in a variable silently drops its strings from the .pot file.
+const unchainedTtagContextRestriction = {
+  selector:
+    "CallExpression[callee.name=c]:not(MemberExpression > CallExpression)",
+  message:
+    "Unchained ttag c() — its strings are dropped from the translation template. Chain it inline: c('context').t`...`",
+};
 
 const baseMetabaseRestrictedConfig = {
   patterns: [
@@ -48,6 +58,10 @@ const baseMetabaseRestrictedConfig = {
       name: "react-redux",
       importNames: ["useSelector", "useDispatch", "connect"],
       message: "Please import from `metabase/redux` instead.",
+    },
+    {
+      name: "react-router",
+      message: "Please import routing from `metabase/router` instead.",
     },
     {
       name: "@mantine/core",
@@ -83,6 +97,10 @@ const configs = [
       "e2e/tmp/**",
       "frontend/test/__support__/custom-viz-fixtures/**/*.js",
       "**/custom-viz/fixtures/example_custom_viz_plugin/**",
+      // The data-app dev entry is served verbatim to the consumer's Vite (it
+      // imports `@metabase/embedding-sdk-react/*` + a virtual config module), so
+      // it can't be resolved/linted in this repo.
+      "enterprise/frontend/src/embedding-sdk-package/data-app-dev-entry.tsx",
       "node_modules/**",
       "**/dist/**",
       "**/target/**",
@@ -151,6 +169,7 @@ const configs = [
     rules: {
       // Base ESLint rules
       strict: ["error", "never"],
+      "no-restricted-syntax": ["error", unchainedTtagContextRestriction],
       "no-undef": "error",
       "no-var": "warn",
       "no-unused-vars": [
@@ -287,10 +306,12 @@ const configs = [
     ],
     plugins: {
       boundaries,
+      metabase: metabasePlugin,
     },
     settings: {
       "boundaries/elements": boundaryElements,
       "boundaries/ignore": ["**/e2e/**", "test/**"],
+      "boundaries/dependency-nodes": ["import", "dynamic-import"],
     },
     rules: {
       "boundaries/element-types": [
@@ -300,6 +321,12 @@ const configs = [
           rules: boundaryRules,
           message: "${file.type} cannot import from ${dependency.type}",
         },
+      ],
+      // Modules flagged `enforcePublicApi` in module-boundaries.mjs must be imported through their index.
+      // Their own files must import relatively.
+      "metabase/enforce-module-public-api": [
+        "error",
+        { modules: getPublicApiModules() },
       ],
       // Every file frontend/src/ and enterprise/frontend/src/ must belong to a declared module.
       "boundaries/no-unknown-files": "error",
@@ -371,6 +398,7 @@ const configs = [
       parser: tseslint.parser,
     },
     rules: {
+      "metabase/no-unjustified-type-casts": "error",
       "prefer-rest-params": "off",
       "react/prop-types": "off",
       "@typescript-eslint/explicit-module-boundary-types": "off",
@@ -572,6 +600,7 @@ const configs = [
       "ttag/no-module-declaration": "error",
       "no-restricted-syntax": [
         "error",
+        unchainedTtagContextRestriction,
         {
           selector: "Literal[value=/mb-base-color-/]",
           message:
@@ -620,6 +649,14 @@ const configs = [
     },
   },
   {
+    // The router facade is the single seam allowed to import `react-router`
+    // directly; every other file goes through `metabase/router`.
+    files: ["frontend/src/metabase/router/**/*"],
+    rules: {
+      "no-restricted-imports": "off",
+    },
+  },
+  {
     files: ["frontend/src/metabase/ui/**/*.{js,jsx,ts,tsx}"],
     rules: {
       "no-restricted-imports": [
@@ -631,6 +668,10 @@ const configs = [
             "cljs/metabase.lib*",
           ],
           paths: [
+            {
+              name: "react-router",
+              message: "Please import routing from `metabase/router` instead.",
+            },
             {
               name: "@emotion/styled",
               message: "Please style components using css modules.",
@@ -666,6 +707,10 @@ const configs = [
               name: "react-redux",
               importNames: ["useSelector", "useDispatch", "connect"],
               message: "Please import from `metabase/redux` instead.",
+            },
+            {
+              name: "react-router",
+              message: "Please import routing from `metabase/router` instead.",
             },
             {
               name: "@mantine/core",
@@ -842,6 +887,10 @@ const configs = [
           ],
           paths: [
             {
+              name: "react-router",
+              message: "Please import routing from `metabase/router` instead.",
+            },
+            {
               name: "@mantine/core",
               message: "Please import from `metabase/ui` instead.",
             },
@@ -914,6 +963,10 @@ const configs = [
         {
           patterns: [{ group: ["cljs/metabase.lib*"] }],
           paths: [
+            {
+              name: "react-router",
+              message: "Please import routing from `metabase/router` instead.",
+            },
             {
               name: "@mantine/core",
               message: "Please import from `metabase/ui` instead.",
@@ -1053,7 +1106,7 @@ const configs = [
     },
   },
   {
-    files: ["frontend/lint/**/*.js"],
+    files: ["frontend/lint/**/*.js", "frontend/lint/**/*.mjs"],
     languageOptions: {
       globals: {
         ...globals.node,

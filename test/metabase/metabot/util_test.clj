@@ -1,108 +1,37 @@
 (ns metabase.metabot.util-test
   (:require
-   [clojure.java.io :as io]
+   [clojure.string :as str]
    [clojure.test :refer :all]
    [metabase.metabot.util :as metabot.u]))
 
-(deftest ^:parallel aisdk-line-parse-test
-  (testing "We should be able to parse AI SDK streaming format to ai-service format 1"
-    (is (=? [{:role       "assistant"
-              :_type      :TOOL_CALL
-              :tool_calls [{:id        "call_hZ6Q9AwsxqXaL0lbtpoAEdBi"
-                            :name      "construct_notebook_query"
-                            :arguments #"\{\"query_plan\":.*\}"}]}
-             {:role         "tool"
-              :_type        :TOOL_RESULT
-              :tool_call_id "call_hZ6Q9AwsxqXaL0lbtpoAEdBi"
-              :content      #"(?s)\n<result>.*</instructions>"}
-             {:role    "assistant"
-              :_type   :TEXT
-              :content #"(?s)I created.*let me know!"}
-             {:type    "state"
-              :_type   :DATA
-              :version 1
-              :value   {}}
-             {:finish_reason "stop"
-              :_type         :FINISH_MESSAGE
-              :usage         {}}]
-            (metabot.u/aisdk->messages "assistant"
-                                       (-> (io/resource "metabase/metabot/aisdkstream1.txt")
-                                           io/reader
-                                           line-seq))))))
-
-(deftest ^:parallel aisdk-line-parse-test-2
-  (testing "We should be able to parse AI SDK streaming format to ai-service format 2"
-    (is (=? [{:role       "assistant"
-              :_type      :TOOL_CALL
-              :tool_calls [{:id        "call_sJpEjRXSqi5vSjAOJXFdJhjt"
-                            :name      "create_chart"
-                            :arguments #"\{\"data_source\":.*\}"}]}
-             {:role         "tool"
-              :_type        :TOOL_RESULT
-              :tool_call_id "call_sJpEjRXSqi5vSjAOJXFdJhjt"
-              :content      #"(?s)\n<result>.*</instructions>"}
-             {:role       "assistant"
-              :_type      :TOOL_CALL
-              :tool_calls [{:id        "call_oPCH01Dt3jlFAwRuemtq9fTt"
-                            :name      "navigate_user"
-                            :arguments #"\{\"destination\":.*\}"}]}
-             {:type    "navigate_to"
-              :_type   :DATA
-              :version 1
-              :value   #"/question#eyJ.*"}
-             {:role         "tool"
-              :_type        :TOOL_RESULT
-              :tool_call_id "call_oPCH01Dt3jlFAwRuemtq9fTt"
-              :content      #"(?s)The user now can see the result of the chart.*"}
-             {:role    "assistant"
-              :_type   :TEXT
-              :content #"(?s)I created.*more details!"}
-             {:type    "state"
-              :_type   :DATA
-              :version 1
-              :value   {}}
-             {:finish_reason "stop"
-              :_type         :FINISH_MESSAGE
-              :usage         {}}]
-            (metabot.u/aisdk->messages "assistant"
-                                       (-> (io/resource "metabase/metabot/aisdkstream2.txt")
-                                           io/reader
-                                           line-seq))))))
-
-(deftest ^:parallel aisdk-line-parse-test-3
-  (testing "We should be able to parse AI SDK streaming format with error messages 3"
-    (is (=? [{:role    "assistant"
-              :_type   :ERROR
-              :content #"litellm.ServiceUnavailableError: litellm.MidStreamFallbackError:.*Connection closed."}
-             {:finish_reason "error"
-              :_type         :FINISH_MESSAGE
-              :usage         {}}]
-            (metabot.u/aisdk->messages "assistant"
-                                       (-> (io/resource "metabase/metabot/aisdkstream3.txt")
-                                           io/reader
-                                           line-seq))))))
-
-(deftest ^:parallel aisdk-line-parse-test-4
-  (testing "We should be able to parse AI SDK streaming format with error messages 4"
-    (is (=? [{:role    "assistant"
-              :_type   :TEXT
-              :content #"(?s)I'll help.*find the right source."}
-             {:role       "assistant"
-              :_type      :TOOL_CALL
-              :tool_calls [{:id        "toolu_bdrk_01GPPfFCzqWpZhsDdGMi9mYi"
-                            :name      "search"
-                            :arguments #"\{\"semantic_queries\":.*\}"}]}
-             {:role         "tool"
-              :_type        :TOOL_RESULT
-              :tool_call_id "toolu_bdrk_01GPPfFCzqWpZhsDdGMi9mYi"
-              :content      #"(?s)\n<result>.*</instructions>"}
-             {:role    "assistant"
-              :_type   :ERROR
-              :content #"litellm.Timeout: Timeout Error: OpenrouterException.*seconds"}
-             {:finish_reason "error"
-              :_type         :FINISH_MESSAGE
-              :usage         {}}]
-            (metabot.u/aisdk->messages "assistant"
-                                       (-> (io/resource "metabase/metabot/aisdkstream4.txt")
-                                           io/reader
-                                           line-seq))))))
+(deftest ^:parallel transform-query->text-test
+  (testing "native query renders as its SQL"
+    (is (= "SELECT 1"
+           (metabot.u/transform-query->text {:stages [{:lib/type :mbql.stage/native
+                                                       :native   "SELECT 1"}]}))))
+  (testing "legacy format renders as its SQL"
+    (is (= "SELECT 2"
+           (metabot.u/transform-query->text {:native {:query "SELECT 2"}}))))
+  (testing "notebook-built query renders as EDN without the metadata provider"
+    (let [text (metabot.u/transform-query->text {:lib/type     :mbql/query
+                                                 :lib/metadata :fake-provider
+                                                 :stages       [{:lib/type :mbql.stage/mbql}]})]
+      (is (str/includes? text ":mbql.stage/mbql"))
+      (is (not (str/includes? text ":lib/metadata")))))
+  (testing "raw string query passes through verbatim"
+    (is (= "SELECT * FROM legacy" (metabot.u/transform-query->text "SELECT * FROM legacy"))))
+  (testing "orphaned source (string keys, skipped normalization) renders as its SQL"
+    (is (= "SELECT 3"
+           (metabot.u/transform-query->text {"database" nil
+                                             "native"   {"query" "SELECT 3"}})))
+    (is (= "SELECT 4"
+           (metabot.u/transform-query->text {"database" nil
+                                             "stages"   [{"native" "SELECT 4"}]}))))
+  (testing "multi-stage query falls through to EDN rather than dropping stages"
+    (let [text (metabot.u/transform-query->text {:stages [{:lib/type :mbql.stage/native
+                                                           :native   "SELECT 5"}
+                                                          {:lib/type :mbql.stage/mbql}]})]
+      (is (not= "SELECT 5" text))
+      (is (str/includes? text ":mbql.stage/mbql"))))
+  (testing "nil stays nil"
+    (is (nil? (metabot.u/transform-query->text nil)))))

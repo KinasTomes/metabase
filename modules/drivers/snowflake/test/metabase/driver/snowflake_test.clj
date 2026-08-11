@@ -56,6 +56,17 @@
 
 (set! *warn-on-reflection* true)
 
+(deftest ^:parallel connection-hosts-test
+  (are [details expected] (= expected (driver/connection-hosts :snowflake details))
+    {:account "xy12345.us-east-2.aws"}
+    ["xy12345.us-east-2.aws.snowflakecomputing.com"]
+
+    {:account "xy12345" :use-hostname true :host "snowflake.example.com"}
+    ["snowflake.example.com"]
+
+    {:account "xy12345" :use-hostname true :host "https://snowflake.example.com:443"}
+    ["snowflake.example.com"]))
+
 (defn- query->native! [query]
   (let [check-sql-fn (fn [_ _ sql & _]
                        (throw (ex-info "done" {::native-query sql})))]
@@ -170,19 +181,20 @@
                                                                                             (assoc :host alternative-host)
                                                                                             (assoc :use-hostname use-hostname))]
                                                                             (sql-jdbc.conn/connection-details->spec :snowflake details))))
-        true nil "//ls10467.us-east-2.aws.snowflakecomputing.com/?enablePutGet=false"
-        true "" "//ls10467.us-east-2.aws.snowflakecomputing.com/?enablePutGet=false"
-        true "  " "//ls10467.us-east-2.aws.snowflakecomputing.com/?enablePutGet=false"
-        true "snowflake.example.com/" "//snowflake.example.com/?enablePutGet=false"
-        true "snowflake.example.com" "//snowflake.example.com/?enablePutGet=false"
-        false nil "//ls10467.us-east-2.aws.snowflakecomputing.com/?enablePutGet=false"
-        false "" "//ls10467.us-east-2.aws.snowflakecomputing.com/?enablePutGet=false"
-        false "snowflake.example.com/" "//ls10467.us-east-2.aws.snowflakecomputing.com/?enablePutGet=false"
-        false "snowflake.example.com" "//ls10467.us-east-2.aws.snowflakecomputing.com/?enablePutGet=false"))
+        true nil "//ls10467.us-east-2.aws.snowflakecomputing.com/"
+        true "" "//ls10467.us-east-2.aws.snowflakecomputing.com/"
+        true "  " "//ls10467.us-east-2.aws.snowflakecomputing.com/"
+        true "snowflake.example.com/" "//snowflake.example.com/"
+        true "snowflake.example.com" "//snowflake.example.com/"
+        false nil "//ls10467.us-east-2.aws.snowflakecomputing.com/"
+        false "" "//ls10467.us-east-2.aws.snowflakecomputing.com/"
+        false "snowflake.example.com/" "//ls10467.us-east-2.aws.snowflakecomputing.com/"
+        false "snowflake.example.com" "//ls10467.us-east-2.aws.snowflakecomputing.com/"))
     (testing "Unsafe options are removed"
-      (let [details (assoc details :additional-options "enablePutGet=true")
-            spec (sql-jdbc.conn/connection-details->spec :snowflake details)]
-        (is (re-find #"enablePutGet=false" (:subname spec)))))
+      (doseq [opts [nil "enablePutGet=true"]]
+        (let [spec (sql-jdbc.conn/connection-details->spec :snowflake (assoc details :additional-options opts))]
+          (is (= "false" (:enablePutGet spec)))
+          (is (not (re-find #"(?i)enablePutGet" (str (:subname spec))))))))
     (testing "Application parameter is set to identify Metabase connections"
       (is (= "Metabase_Metabase"
              (:application (sql-jdbc.conn/connection-details->spec :snowflake details)))))))
@@ -450,6 +462,30 @@
                                                  {:schema-names [(:schema dynamic-table)]
                                                   :table-names  [(:name dynamic-table)]}))))))))))))
 
+(deftest ^:parallel show-dynamic-tables-sql-test
+  (testing "only the LIKE pattern escapes `_`; the IN SCHEMA identifiers stay raw (#78541)"
+    (is (= "SHOW DYNAMIC TABLES LIKE 'MY\\_TABLE' IN SCHEMA \"MY_DB\".\"RAW_DATA\";"
+           (#'driver.snowflake/show-dynamic-tables-sql "MY_DB" "RAW_DATA" "MY_TABLE")))))
+
+(deftest ^:synchronized describe-fks-dynamic-table-check-test
+  (testing "the FK path passes raw names to the dynamic table check (#78541)"
+    (let [dynamic-table-args (atom nil)
+          fk-args            (atom nil)]
+      (with-redefs [driver.snowflake/dynamic-table?
+                    (fn [_conn db-name schema table-name]
+                      (reset! dynamic-table-args [db-name schema table-name])
+                      false)
+
+                    sql-jdbc.sync/reducible-table-fks-from-jdbc-metadata
+                    (fn [_metadata db-name schema table-name]
+                      (reset! fk-args [db-name schema table-name])
+                      [])]
+        (#'driver.snowflake/reducible-table-fks-from-jdbc-metadata
+         (reify java.sql.Connection) (reify java.sql.DatabaseMetaData) "MY_DB" "RAW_DATA" "MY_TABLE"))
+      (is (= ["MY_DB" "RAW_DATA" "MY_TABLE"] @dynamic-table-args))
+      (testing "but still escapes for the JDBC metadata call, which treats them as patterns"
+        (is (= ["MY_DB" "RAW\\_DATA" "MY\\_TABLE"] @fk-args))))))
+
 (deftest ^:sequential describe-table-fields-uuid-column-test
   (mt/test-driver :snowflake
     (testing "Snowflake tables with UUID columns should sync successfully (#71595)"
@@ -712,27 +748,28 @@
 (deftest can-change-from-password-test
   (mt/test-driver
     :snowflake
-    (let [details (:details (mt/db))
+    ;; the test DB authenticates with a private key, so give it a password to switch away from
+    (let [details (assoc (:details (mt/db)) :password "test-password" :use-password true)
           pk-key "testing"]
       (is (=?
            {:user some?
             :password some?
-            :private_key_file complement}
+            :private_key_file :hawk/key-not-present}
            (sql-jdbc.conn/connection-details->spec :snowflake details)))
       (is (=?
            {:user some?
             :password some?
-            :private_key_file complement}
+            :private_key_file :hawk/key-not-present}
            ;; Before `use-password` password took precedence over a key file
            (sql-jdbc.conn/connection-details->spec :snowflake (assoc details :private-key-value pk-key))))
       (is (=?
            {:user some?
-            :password complement
+            :password :hawk/key-not-present
             :private_key_file some?}
            (sql-jdbc.conn/connection-details->spec :snowflake (assoc details :password nil :private-key-value pk-key))))
       (is (=?
            {:user some?
-            :password complement
+            :password :hawk/key-not-present
             :private_key_file some?}
            (sql-jdbc.conn/connection-details->spec :snowflake (assoc details :use-password false :private-key-value pk-key)))))))
 
@@ -1161,7 +1198,7 @@
                                           :details {:use-password false
                                                     :password "abc"}}]
         (is (= {:password "abc" :use-password true} (:details db1)))
-        (is (=? {:password "abc" :private-key-id int? :use-password complement} (:details db2)))
+        (is (=? {:password "abc" :private-key-id int? :use-password :hawk/key-not-present} (:details db2)))
         (is (= {:password "abc" :use-password false} (:details db3)))))))
 
 (deftest ^:parallel normalize-write-data-details-test
@@ -1688,12 +1725,16 @@
                                                             (assoc :private-key-value priv-key-val)
                                                             (assoc :use-password false)
                                                             (assoc :dbname nil))}]
-              (is (= #{{:name "continent",    :schema "PUBLIC", :description nil}
-                       {:name "municipality", :schema "PUBLIC", :description nil}
-                       {:name "region",       :schema "PUBLIC", :description nil}
-                       {:name "country",      :schema "PUBLIC", :description nil}
-                       {:name "airport",      :schema "PUBLIC", :description nil}}
-                     (:tables (driver/describe-database :snowflake db)))))))))))
+              ;; we would ideally check = here, but there are some other completely
+              ;; unrelated tests which create tables in the PUBLIC schema and
+              ;; fail to clean them up correctly, manifesting as failure here
+              (is (set/subset?
+                   #{{:name "continent",    :schema "PUBLIC", :description nil}
+                     {:name "municipality", :schema "PUBLIC", :description nil}
+                     {:name "region",       :schema "PUBLIC", :description nil}
+                     {:name "country",      :schema "PUBLIC", :description nil}
+                     {:name "airport",      :schema "PUBLIC", :description nil}}
+                   (:tables (driver/describe-database :snowflake db)))))))))))
 
 ;;; ------------------------------------------------ Fake Sync Tests ------------------------------------------------
 ;; Tests to validate that fake sync produces correct metadata for Snowflake.
@@ -1734,6 +1775,18 @@
           (mt/with-native-query-testing-context query
             (is (some? (mt/rows (qp/process-query query)))
                 "Hour bucketing on a time field from a source query should not error")))))))
+
+(deftest ^:parallel compile-create-index-test
+  (testing "clustering renders ALTER TABLE ... CLUSTER BY with quoted identifiers"
+    (is (= [["ALTER TABLE \"sch\".\"t\" CLUSTER BY (\"category\", \"price\")"]]
+           (driver/compile-create-index :snowflake "sch" "t"
+                                        {:kind :clustering :name "by_cat"
+                                         :columns [{:name "category"} {:name "price"}]}))))
+  (testing "a SQL-injection payload in a clustering column is quoted+escaped, so it can only ever be an identifier"
+    (is (= [["ALTER TABLE \"t\" CLUSTER BY (\"c\"\"; DROP TABLE x; --\")"]]
+           (driver/compile-create-index :snowflake nil "t"
+                                        {:kind :clustering :name "by_cat"
+                                         :columns [{:name "c\"; DROP TABLE x; --"}]})))))
 
 (deftest upload-type->database-type-test
   (testing "upload types render to the expected Snowflake DDL via the generic create-table! path"

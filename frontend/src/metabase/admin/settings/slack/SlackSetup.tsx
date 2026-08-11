@@ -13,7 +13,8 @@ import {
   ExternalLink,
 } from "metabase/common/components/ExternalLink";
 import { Markdown } from "metabase/common/components/Markdown";
-import { useDocsUrl, useSetting } from "metabase/common/hooks";
+import { useDocsUrl } from "metabase/common/hooks";
+import { useSetting } from "metabase/settings";
 import {
   Badge,
   Box,
@@ -52,10 +53,9 @@ const SlackConnectionStatus = ({
       <Flex justify="space-between" align="center">
         <Flex align="center" gap="sm">
           <Badge
-            circle
-            size="12"
-            bg={isValid ? "feedback-positive" : "feedback-negative"}
-            style={{ flexShrink: 0 }}
+            color={isValid ? "positive" : "negative"}
+            flex="0 0 auto"
+            indicator
           />
           <Text>
             {isValid ? t`Slack app is working` : t`Slack app is not working.`}

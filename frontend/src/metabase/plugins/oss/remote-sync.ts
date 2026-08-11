@@ -61,10 +61,14 @@ const getDefaultPluginRemoteSync = () => ({
   LibraryNav: PluginPlaceholder,
   RemoteSyncSettings: PluginPlaceholder,
   SyncedCollectionsSidebarSection: PluginPlaceholder,
+  // Unjustified type cast. FIXME
   GitSyncAppBarControls: PluginPlaceholder as ComponentType,
+  // Unjustified type cast. FIXME
   GitSettingsModal: PluginPlaceholder as ComponentType<GitSettingsModalProps>,
   GitSyncSetupMenuItem: PluginPlaceholder,
+  // Unjustified type cast. FIXME
   CollectionsNavTree: null as ComponentType<CollectionsNavTreeProps> | null,
+  // Unjustified type cast. FIXME
   CollectionSyncStatusBadge: null as ComponentType | null,
   REMOTE_SYNC_INVALIDATION_TAGS: null,
   useSyncStatus: () => ({
@@ -79,6 +83,7 @@ const getDefaultPluginRemoteSync = () => ({
   useHasTransformDirtyChanges: () => false,
   getIsRemoteSyncReadOnly: () => false,
   useRemoteSyncDirtyState: () =>
+    // Unjustified type cast. FIXME
     ({
       isCollectionDirty: false,
     }) as unknown as RemoteSyncDirtyState,
