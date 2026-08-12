@@ -1,8 +1,10 @@
 # MetaBot POC — bộ câu hỏi demo
 
-Sử dụng bộ câu hỏi này sau khi đã kết nối Metabase với các view `analytics`
-chứa dữ liệu Gold từ project BI cũ. Đây là acceptance suite cho demo thủ công,
-không phải holdout benchmark.
+Sử dụng bộ câu hỏi này sau khi đã kết nối Metabase với schema `analytics` của
+warehouse POC. Đây là acceptance suite cho demo thủ công, không phải holdout
+benchmark.
+
+Kết quả mong đợi từng câu nằm ở [EXPECTED_RESULTS.md](EXPECTED_RESULTS.md).
 
 ## Phạm vi dữ liệu
 
@@ -37,22 +39,29 @@ không phải holdout benchmark.
 
 ## Kết quả đã từng kiểm tra live ở agent cũ
 
+Cả ba đều đã được xác nhận lại trên dữ liệu Silver hiện tại.
+
 | Câu hỏi | Kết quả mong đợi |
 | --- | --- |
 | Doanh thu completed của GSM theo tháng trong toàn bộ dữ liệu. | 12 tháng và biểu đồ đường |
 | Số giao dịch completed của VinFast theo sản phẩm trong toàn bộ dữ liệu. | 3 nhóm: `vehicle`, `accessories`, `service` |
 | Số event của GSM theo tên sự kiện trong toàn bộ dữ liệu. | 6 loại event và biểu đồ cột |
 
-## Mapping semantic dự kiến
+## Mapping semantic
 
-| Nhóm câu hỏi | Measure chính | Dimension có thể dùng |
-| --- | --- | --- |
-| Doanh thu completed | `Transactions.revenue` | `company`, `product`, `province`, `transactionDate` |
-| Giao dịch completed | `Transactions.transactionCount` | `company`, `product`, `province`, `transactionDate` |
-| Event | `Events.eventCount` | `eventName`, `province`, `eventDate` |
+Bộ câu hỏi này ban đầu viết cho Cube. POC không dùng Cube; nguồn là hai view
+fact-grain trong schema `analytics`, MetaBot tự viết `GROUP BY`.
 
-Khi cấu hình Metabase, chuyển mapping này thành tên, mô tả và metric/model
-tương ứng trong semantic layer; MetaBot không dùng trực tiếp Cube member names.
+| Nhóm câu hỏi | View | Measure | Dimension |
+| --- | --- | --- | --- |
+| Doanh thu completed | `analytics.fact_transactions` | `SUM(revenue)` | `company`, `product`, `province`, `transaction_month`, `transaction_date` |
+| Giao dịch completed | `analytics.fact_transactions` | `COUNT(*)` | như trên |
+| Event | `analytics.fact_events` | `COUNT(*)` | `company`, `event_name`, `province`, `event_month`, `event_date` |
+
+Tên và mô tả cột trong `04_init_analytics_views.sql` mang sẵn thuật ngữ tiếng
+Việt (doanh thu, tỉnh, sản phẩm, sự kiện). POC không có entitlement
+`:ai-controls` nên không sửa được system prompt — mô tả cột là kênh duy nhất
+còn tác động được tới chất lượng câu trả lời.
 
 ## Không dùng trong demo đầu tiên
 

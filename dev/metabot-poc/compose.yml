@@ -15,6 +15,27 @@ services:
     volumes:
       - metabot_app_db:/var/lib/postgresql/data
 
+  # BI warehouse. Separate from the app DB on purpose: Metabase connects to it
+  # as a least-privilege reader that can only see the `analytics` schema, so a
+  # misconfigured question cannot reach Silver or Gold.
+  warehouse:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${WAREHOUSE_DB:-bi_warehouse}
+      POSTGRES_USER: ${WAREHOUSE_USER:-postgres}
+      POSTGRES_PASSWORD: ${WAREHOUSE_PASSWORD:?Set WAREHOUSE_PASSWORD in dev/metabot-poc/.env}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    volumes:
+      - metabot_warehouse:/var/lib/postgresql/data
+    ports:
+      # Exposed so load_warehouse.py can run from the host. 5433 avoids
+      # clashing with a local Postgres or the bi-agent stack on 5432.
+      - "${WAREHOUSE_HOST_PORT:-5433}:5432"
+
   metabase:
     build:
       context: ../..
@@ -38,8 +59,11 @@ services:
     depends_on:
       metabot-app-db:
         condition: service_healthy
+      warehouse:
+        condition: service_healthy
     ports:
       - "${METABOT_HOST_PORT:-3000}:3000"
 
 volumes:
   metabot_app_db:
+  metabot_warehouse:
