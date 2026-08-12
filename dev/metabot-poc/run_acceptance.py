@@ -22,6 +22,7 @@ Usage:
 import base64
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -162,9 +163,25 @@ def ask(question, timeout=420):
             "query": decode_query(navs[-1]) if navs else None}
 
 
-def is_rate_limit(outcome):
-    blob = " ".join(outcome["errors"]).lower()
-    return "429" in blob or "rate limit" in blob or "usagelimit" in blob
+# Some gateways report their own failures as assistant text rather than on the
+# stream's error channel, e.g. `[qoder error 504: upstream model timeout]`.
+# Left undetected these look exactly like a model that declined to answer, which
+# blames Metabot for an upstream outage.
+GATEWAY_ERROR_RE = re.compile(r"^\[\w+ error (\d{3})\b")
+
+
+def gateway_error(outcome):
+    match = GATEWAY_ERROR_RE.match(outcome["text"].strip())
+    return match.group(0).strip("[") + ": " + outcome["text"].strip()[:160] if match else None
+
+
+def is_retryable(outcome):
+    """Rate limits, upstream queueing, and gateway timeouts are all worth a retry."""
+    blob = (" ".join(outcome["errors"]) + " " + outcome["text"][:400]).lower()
+    if any(s in blob for s in ("429", "rate limit", "usagelimit")):
+        return True
+    match = GATEWAY_ERROR_RE.match(outcome["text"].strip())
+    return bool(match and match.group(1) in {"403", "429", "500", "502", "503", "504"})
 
 
 def decode_query(nav_url):
@@ -237,11 +254,12 @@ def run_one(num, question, spec, retries=RATE_LIMIT_RETRIES):
                     "detail": f"{type(exc).__name__}: {exc}",
                     "seconds": round(time.time() - started, 1)}
 
-        if not is_rate_limit(outcome) or attempt == retries:
+        if not is_retryable(outcome) or attempt == retries:
             break
         # Free tiers meter over a window, so back off rather than hammering.
         wait = RATE_LIMIT_BACKOFF * (2 ** attempt)
-        print(f"     rate limited, retrying in {wait}s "
+        reason = gateway_error(outcome) or "rate limited"
+        print(f"     {reason[:70]} — retrying in {wait}s "
               f"(attempt {attempt + 1}/{retries})", flush=True)
         time.sleep(wait)
 
@@ -255,7 +273,13 @@ def run_one(num, question, spec, retries=RATE_LIMIT_RETRIES):
         "seconds": round(time.time() - started, 1),
     }
 
-    if is_rate_limit(outcome):
+    upstream = gateway_error(outcome)
+    if upstream:
+        record["verdict"] = "PROVIDER_ERROR"
+        record["detail"] = upstream[:160]
+        return record
+
+    if is_retryable(outcome):
         record["verdict"] = "RATE_LIMITED"
         record["detail"] = "provider refused after retries — model quota exhausted"
         return record
@@ -299,7 +323,7 @@ def write_report(records):
         "| Verdict | Số câu |",
         "| --- | ---: |",
     ]
-    for v in ("PASS", "WRONG", "NO_QUERY", "QUERY_FAILED", "ERROR"):
+    for v in ("PASS", "WRONG", "NO_QUERY", "PROVIDER_ERROR", "RATE_LIMITED", "QUERY_FAILED", "ERROR"):
         if v in verdicts:
             lines.append(f"| {v} | {verdicts[v]} |")
 
@@ -314,6 +338,20 @@ def write_report(records):
     REPORT_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def load_previous():
+    """Keep earlier results so re-running a subset does not discard the rest.
+
+    Reruns are the normal way to work through gateway flakiness, and losing the
+    passes from the full run every time would make the report useless.
+    """
+    if not RESULTS_PATH.exists():
+        return {}
+    try:
+        return {r["n"]: r for r in json.loads(RESULTS_PATH.read_text(encoding="utf-8"))}
+    except (json.JSONDecodeError, KeyError, TypeError):
+        return {}
+
+
 def main():
     wanted = {int(a) for a in sys.argv[1:]} or None
     todo = [q for q in QUESTIONS if wanted is None or q[0] in wanted]
@@ -321,19 +359,25 @@ def main():
     P.authenticate()
     print(f"Running {len(todo)} question(s)\n", flush=True)
 
+    merged = load_previous()
     records = []
     for num, question, spec in todo:
         print(f"[{num:>2}] {question[:66]}", flush=True)
         record = run_one(num, question, spec)
         records.append(record)
+        merged[num] = record
         print(f"     {record['verdict']}: {record.get('detail', '')}  ({record['seconds']}s)\n", flush=True)
-        RESULTS_PATH.write_text(json.dumps(records, ensure_ascii=False, indent=2), encoding="utf-8")
+        ordered = [merged[k] for k in sorted(merged)]
+        RESULTS_PATH.write_text(json.dumps(ordered, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    write_report(records)
+    all_records = [merged[k] for k in sorted(merged)]
+    write_report(all_records)
 
     passed = sum(1 for r in records if r["verdict"] == "PASS")
+    overall = sum(1 for r in all_records if r["verdict"] == "PASS")
     print("=" * 60)
-    print(f"{passed}/{len(records)} PASS")
+    print(f"this run: {passed}/{len(records)} PASS")
+    print(f"overall:  {overall}/{len(all_records)} PASS")
     print(f"  {RESULTS_PATH}")
     print(f"  {REPORT_PATH}")
     return 0 if passed == len(records) else 1
