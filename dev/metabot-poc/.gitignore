@@ -4,3 +4,4 @@ acceptance_results.json
 acceptance_run.log
 ACCEPTANCE_REPORT.md
 acceptance_results.*.json
+.cache/
