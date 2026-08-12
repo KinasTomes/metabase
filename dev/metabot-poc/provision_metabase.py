@@ -262,6 +262,79 @@ def ensure_collection():
     return created["id"]
 
 
+def metric_specs(db_id, tables):
+    """The three measures the demo questions are built around.
+
+    Metabot can already aggregate the raw views, so these exist to name the
+    measures in business terms and to pin their definition -- particularly the
+    `completed` filter, which is what "doanh thu" means to the business even
+    though every row in this dataset happens to satisfy it.
+    """
+    def field(table, name):
+        for f in tables[table]["fields"]:
+            if f["name"] == name:
+                return ["field", f["id"], {"base-type": f["base_type"]}]
+        raise ProvisionError(f"{table}.{name} not found — did the sync change?")
+
+    tx = tables["fact_transactions"]["id"]
+    ev = tables["fact_events"]["id"]
+    completed = ["=", field("fact_transactions", "status"), "completed"]
+
+    return [
+        {
+            "name": "Doanh thu",
+            "description": (
+                "Tổng doanh thu (VND) của các giao dịch completed. Dùng cho câu hỏi "
+                "về doanh thu, revenue, doanh số. Lưu ý: doanh thu VinFast bằng 0 "
+                "trên toàn bộ dữ liệu nên chỉ có ý nghĩa với GSM."
+            ),
+            "query": {"source-table": tx,
+                      "aggregation": [["sum", field("fact_transactions", "revenue")]],
+                      "filter": completed},
+        },
+        {
+            "name": "Số giao dịch",
+            "description": (
+                "Số lượng giao dịch completed. Dùng cho câu hỏi về số giao dịch, "
+                "lượng giao dịch, transaction count."
+            ),
+            "query": {"source-table": tx, "aggregation": [["count"]], "filter": completed},
+        },
+        {
+            "name": "Số event",
+            "description": (
+                "Số lượng event của người dùng trên app. Dùng cho câu hỏi về event, "
+                "sự kiện, tương tác. Không liên quan tới doanh thu."
+            ),
+            "query": {"source-table": ev, "aggregation": [["count"]]},
+        },
+    ]
+
+
+def ensure_metrics(db_id, tables, collection_id):
+    items = call("GET", f"/collection/{collection_id}/items")
+    existing = {i["name"]: i for i in items.get("data", []) if i.get("model") == "metric"}
+
+    created = []
+    for spec in metric_specs(db_id, tables):
+        if spec["name"] in existing:
+            print(f"  {spec['name']}: already exists (id={existing[spec['name']]['id']})")
+            created.append(existing[spec["name"]]["id"])
+            continue
+        card = call("POST", "/card", {
+            "name": spec["name"],
+            "type": "metric",
+            "description": spec["description"],
+            "dataset_query": {"database": db_id, "type": "query", "query": spec["query"]},
+            "display": "scalar",
+            "visualization_settings": {},
+            "collection_id": collection_id,
+        })
+        print(f"  {spec['name']}: created (id={card['id']})")
+        created.append(card["id"])
+    return created
+
+
 def main():
     wait_for_health()
     authenticate()
@@ -270,9 +343,13 @@ def main():
     described = verify_descriptions(tables)
     collection_id = ensure_collection()
 
+    print("Creating metrics...")
+    metrics = ensure_metrics(db_id, tables, collection_id)
+
     print("\n" + "=" * 60)
     print(f"Database   id={db_id}  ({DB_DISPLAY_NAME})")
     print(f"Collection id={collection_id}  ({COLLECTION_NAME})")
+    print(f"Metrics    {len(metrics)} in collection")
     print(f"Descriptions synced: {'yes' if described else 'NO'}")
     print("=" * 60)
     print(
