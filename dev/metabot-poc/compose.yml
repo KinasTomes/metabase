@@ -56,6 +56,18 @@ services:
       MB_LOAD_SAMPLE_CONTENT: "false"
       MB_ANON_TRACKING_ENABLED: "false"
       MB_AI_FEATURES_ENABLED: "true"
+
+      # Which provider and model Metabot talks to, as `provider/model`. This is
+      # the only variable to change when switching providers — keys for both can
+      # stay set, since credentials are looked up by whichever provider this
+      # names. Blank keys read as unconfigured, so unused ones are harmless.
+      MB_LLM_METABOT_PROVIDER: ${MB_LLM_METABOT_PROVIDER:-anthropic/claude-sonnet-4-6}
+
+      MB_LLM_ANTHROPIC_API_KEY: ${MB_LLM_ANTHROPIC_API_KEY:-}
+      MB_LLM_ANTHROPIC_API_BASE_URL: ${MB_LLM_ANTHROPIC_API_BASE_URL:-https://api.anthropic.com}
+
+      MB_LLM_OPENAI_API_KEY: ${MB_LLM_OPENAI_API_KEY:-}
+      MB_LLM_OPENAI_API_BASE_URL: ${MB_LLM_OPENAI_API_BASE_URL:-https://api.openai.com}
     depends_on:
       metabot-app-db:
         condition: service_healthy
