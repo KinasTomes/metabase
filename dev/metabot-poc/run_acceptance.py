@@ -137,11 +137,37 @@ def ask(question, timeout=420):
     req.add_header("X-Metabase-Session", P._session_token)
 
     text, tools, navs, errors = "", [], [], []
+    queries, preferred = {}, None
+
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         for raw in resp:
             line = raw.decode(errors="replace").rstrip()
-            if not line or ":" not in line:
+            if not line:
                 continue
+
+            if line.startswith("data: "):
+                # Current protocol: SSE frames carrying typed parts.
+                try:
+                    ev = json.loads(line[6:])
+                except json.JSONDecodeError:
+                    continue
+                kind = ev.get("type")
+                if kind == "text-delta":
+                    text += ev.get("delta", "")
+                elif kind == "tool-input-available":
+                    tools.append(ev.get("toolName"))
+                elif kind == "data-state":
+                    # Where the built query now lives, in MBQL lib (pMBQL) shape.
+                    queries.update((ev.get("data") or {}).get("queries") or {})
+                elif kind == "data-generated_entity":
+                    # Names which of the queries in state the answer is about.
+                    preferred = ((ev.get("data") or {}).get("query") or {}).get("id")
+                elif kind == "error":
+                    errors.append(json.dumps(ev))
+                continue
+
+            # Legacy protocol, kept so older builds still grade: prefixed lines
+            # `0:"text"`, `9:{tool}`, `2:{data}`, `3:error`.
             tag, _, payload = line.partition(":")
             try:
                 value = json.loads(payload)
@@ -159,8 +185,13 @@ def ask(question, timeout=420):
                 # a 429 arrives here rather than as an HTTP status.
                 errors.append(value if isinstance(value, str) else json.dumps(value))
 
-    return {"text": text, "tools": tools, "errors": errors,
-            "query": decode_query(navs[-1]) if navs else None}
+    query = None
+    if queries:
+        query = queries.get(preferred) or list(queries.values())[-1]
+    elif navs:
+        query = decode_query(navs[-1])
+
+    return {"text": text, "tools": tools, "errors": errors, "query": query}
 
 
 # Some gateways report their own failures as assistant text rather than on the
