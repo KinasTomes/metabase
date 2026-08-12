@@ -8,9 +8,10 @@ Steps
   2. Complete first-time setup, or log in if an admin already exists.
   3. Register the warehouse as a database, connecting as the read-only
      `metabase_reader` role and restricted to the `analytics` schema.
-  4. Trigger a schema sync and wait for the two views and their fields.
+  4. Trigger a schema sync and wait for the curated views and their fields.
   5. Verify the Postgres COMMENTs arrived as table and field descriptions.
-  6. Create the collection that will hold curated MetaBot content.
+  6. Declare the foreign keys, which views cannot advertise on their own.
+  7. Create the collection that will hold curated MetaBot content.
 
 Step 5 is the point of the exercise. This POC has no :ai-controls entitlement,
 so the Metabot system prompt cannot be customized, and column descriptions are
@@ -63,7 +64,30 @@ READER_PASSWORD = os.getenv("WAREHOUSE_READER_PASSWORD")
 DB_DISPLAY_NAME = os.getenv("METABOT_DB_NAME", "BI Warehouse")
 COLLECTION_NAME = os.getenv("METABOT_COLLECTION_NAME", "BI Analytics")
 
-EXPECTED_TABLES = {"fact_transactions": 31685, "fact_events": 40000}
+EXPECTED_TABLES = {
+    "fact_transactions": 31685,
+    "fact_events": 40000,
+    "dim_customer": 4000,
+    "dim_global_customer": 2600,
+    "fact_customer_features": 2400,
+}
+
+# Declared join paths, as (table, column) -> (target table, target column).
+#
+# Postgres exposes no foreign keys on views, so Metabase's sync finds none and
+# Metabot sees five unrelated tables. These have to be set through the API.
+#
+# Every arrow points at dim_global_customer.global_customer_id because it is the
+# only unique key among them. Metabase FKs are single-column, and the other
+# candidate keys are composite — (customer_id, pnl) for the facts,
+# (global_customer_id, snapshot_month) for the features — so an FK onto any of
+# them would join one row to many and inflate every aggregate downstream.
+FK_LINKS = {
+    ("fact_transactions", "global_customer_id"): ("dim_global_customer", "global_customer_id"),
+    ("fact_events", "global_customer_id"): ("dim_global_customer", "global_customer_id"),
+    ("fact_customer_features", "global_customer_id"): ("dim_global_customer", "global_customer_id"),
+    ("dim_customer", "global_customer_id"): ("dim_global_customer", "global_customer_id"),
+}
 
 _session_token = None
 
@@ -239,6 +263,55 @@ def verify_descriptions(tables):
     return True
 
 
+def ensure_fk_metadata(tables):
+    """Declare the join paths Postgres cannot tell Metabase about.
+
+    Marking the source column type/FK and pointing it at the target field is
+    what puts the table in Metabot's reach when it builds a joined query, and
+    what makes the relationship visible in the notebook editor.
+
+    Also marks the target itself as an entity key, so Metabase treats it as the
+    identifying column rather than a value to aggregate.
+    """
+    print("Declaring foreign keys...")
+
+    def find_field(table_name, column):
+        table = tables.get(table_name)
+        if not table:
+            raise ProvisionError(f"{table_name} missing from sync — cannot link FKs.")
+        for f in table.get("fields", []):
+            if f["name"] == column:
+                return f
+        raise ProvisionError(f"{table_name}.{column} not found in synced fields.")
+
+    targets = {t for t in FK_LINKS.values()}
+    for table_name, column in sorted(targets):
+        field = find_field(table_name, column)
+        if field.get("semantic_type") != "type/PK":
+            call("PUT", f"/field/{field['id']}", {"semantic_type": "type/PK"})
+            print(f"  {table_name}.{column}: marked entity key")
+
+    changed = 0
+    for (table_name, column), (target_table, target_column) in sorted(FK_LINKS.items()):
+        field = find_field(table_name, column)
+        target = find_field(target_table, target_column)
+
+        if (field.get("semantic_type") == "type/FK"
+                and field.get("fk_target_field_id") == target["id"]):
+            continue
+
+        call("PUT", f"/field/{field['id']}", {
+            "semantic_type": "type/FK",
+            "fk_target_field_id": target["id"],
+        })
+        print(f"  {table_name}.{column} -> {target_table}.{target_column}")
+        changed += 1
+
+    if not changed:
+        print("  already declared")
+    return len(FK_LINKS)
+
+
 def ensure_collection():
     existing = call("GET", "/collection")
     for c in existing:
@@ -341,6 +414,7 @@ def main():
     db_id = ensure_database()
     tables = sync_and_wait(db_id)
     described = verify_descriptions(tables)
+    fk_count = ensure_fk_metadata(tables)
     collection_id = ensure_collection()
 
     print("Creating metrics...")
@@ -349,6 +423,7 @@ def main():
     print("\n" + "=" * 60)
     print(f"Database   id={db_id}  ({DB_DISPLAY_NAME})")
     print(f"Collection id={collection_id}  ({COLLECTION_NAME})")
+    print(f"Tables     {len(tables)} synced, {fk_count} join paths declared")
     print(f"Metrics    {len(metrics)} in collection")
     print(f"Descriptions synced: {'yes' if described else 'NO'}")
     print("=" * 60)

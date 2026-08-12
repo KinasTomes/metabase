@@ -1,14 +1,16 @@
 """Load the MetaBot POC warehouse from the local BI pipeline CSVs.
 
-Adapted from ``scripts/load_to_postgres.py`` in the previous BI project. Three
+Adapted from ``scripts/load_to_postgres.py`` in the previous BI project. Four
 differences:
 
 * Only the Silver and Gold layers are loaded. Bronze is a near-duplicate of
   Silver and nothing in this POC reads it.
 * The curated views come from ``04_init_analytics_views.sql``, which exposes
   fact-grain views rather than the old monthly aggregates.
+* The Feature Store is loaded too — registry from JSON, serving values from
+  CSV — and surfaced to BI through the pivoted view in ``07``.
 * A read-only Metabase login is provisioned here, granted on ``analytics``
-  only, so the BI connection cannot browse Silver or Gold.
+  only, so the BI connection cannot browse Silver, Gold or the Feature Store.
 
 The CSV source lives outside the repository (``local-context/`` is untracked).
 Point ``PIPELINE_DIR`` at it with the ``WAREHOUSE_PIPELINE_DIR`` environment
@@ -16,6 +18,7 @@ variable.
 """
 
 import csv
+import json
 import os
 import sys
 from pathlib import Path
@@ -69,6 +72,10 @@ READER_PASSWORD = os.getenv("WAREHOUSE_READER_PASSWORD")
 DDL_FILES = [
     "01_init_bronze_silver_gold.sql",
     "04_init_analytics_views.sql",
+    "05_init_feature_store.sql",
+    "06_init_analytics_dim_customer.sql",
+    # Generated from the registry — see gen_feature_view_sql.py.
+    "07_init_analytics_features.sql",
 ]
 
 # Load order respects the foreign keys declared in the Silver DDL:
@@ -85,7 +92,28 @@ LOAD_PLAN = [
     ("gold", "gold_customer_monthly"),
 ]
 
-CURATED_VIEWS = ["fact_transactions", "fact_events"]
+CURATED_VIEWS = [
+    "fact_transactions",
+    "fact_events",
+    "dim_customer",
+    "dim_global_customer",
+    "fact_customer_features",
+]
+
+# The Feature Store arrives in two pieces with different formats: the registry
+# is the governed JSON contract, the values are a serving CSV export.
+FEATURE_REGISTRY_JSON = PIPELINE_DIR / "feature_store" / "registry_1.0.0.json"
+FEATURE_VALUES_CSV = PIPELINE_DIR / "serving" / "feature_values_monthly_v1_0_0.csv"
+
+# JSON key -> registry column, for the two that differ. Everything else matches.
+REGISTRY_KEY_MAP = {"owner": "owner_name", "window": "window_name"}
+# Stored as JSONB, so they have to be serialised rather than passed as lists.
+REGISTRY_JSON_COLUMNS = ("governance_decision_ids", "assumption_ids", "dq_checks")
+
+FEATURE_STORE_TABLES = [
+    ("feature_store", "feature_registry"),
+    ("feature_store", "feature_values_monthly"),
+]
 
 
 def get_connection():
@@ -117,6 +145,62 @@ def load_table(cursor, schema, table, rows):
 
     execute_values(cursor, query, values, page_size=1000)
     return len(rows)
+
+
+def load_feature_store(cursor):
+    """Load the Feature Store registry and its monthly serving values.
+
+    Kept out of LOAD_PLAN because neither piece is a plain schema/table.csv: the
+    registry is JSON keyed by a contract version, and the values CSV is named
+    after the version it serves. The registry must land first — the values table
+    has a foreign key into it, which is the mechanism that stops an unregistered
+    feature from being served.
+    """
+    if not FEATURE_REGISTRY_JSON.exists():
+        print(f"  ! missing {FEATURE_REGISTRY_JSON} — skipping feature store")
+        return 0
+
+    registry = json.loads(FEATURE_REGISTRY_JSON.read_text(encoding="utf-8"))
+    version = registry["contract_version"]
+
+    # Children before parents: the FK points values -> registry.
+    cursor.execute("TRUNCATE TABLE feature_store.feature_values_monthly")
+    cursor.execute("TRUNCATE TABLE feature_store.feature_registry CASCADE")
+
+    columns = [
+        "registry_version", "feature_name", "domain", "entity", "grain",
+        "window_name", "source_artifact", "source_column", "owner_name",
+        "semantic_status", "business_approval_status", "source_metadata_status",
+        "definition_source", "value_type", "nullable",
+        "governance_decision_ids", "assumption_ids", "dq_checks",
+        "review_group_id", "review_decision_hash", "provenance_hash",
+    ]
+    reverse_map = {v: k for k, v in REGISTRY_KEY_MAP.items()}
+
+    rows = []
+    for feature in registry["features"]:
+        values = []
+        for column in columns:
+            if column == "registry_version":
+                values.append(version)
+                continue
+            raw = feature[reverse_map.get(column, column)]
+            values.append(json.dumps(raw) if column in REGISTRY_JSON_COLUMNS else raw)
+        rows.append(tuple(values))
+
+    quoted = ", ".join(f'"{c}"' for c in columns)
+    execute_values(
+        cursor,
+        f"INSERT INTO feature_store.feature_registry ({quoted}) VALUES %s",
+        rows,
+    )
+    print(f"  - feature_store.feature_registry: {len(rows)} (registry {version})")
+
+    values_rows = read_csv(FEATURE_VALUES_CSV)
+    n = load_table(cursor, "feature_store", "feature_values_monthly", values_rows)
+    if n:
+        print(f"  - feature_store.feature_values_monthly: {n}")
+    return len(rows) + n
 
 
 def run_ddl(cursor, conn):
@@ -175,7 +259,7 @@ def configure_reader_role(cursor, conn):
 
 def verify(cursor):
     print("\nRow counts:")
-    for schema, table in LOAD_PLAN:
+    for schema, table in LOAD_PLAN + FEATURE_STORE_TABLES:
         cursor.execute(f"SELECT COUNT(*) FROM {schema}.{table}")
         print(f"  - {schema}.{table}: {cursor.fetchone()[0]}")
 
@@ -219,6 +303,9 @@ def main():
         if n:
             print(f"  - {schema}.{table}: {n}")
         total += n
+
+    print("\nLoading feature store...")
+    total += load_feature_store(cursor)
     conn.commit()
 
     print("\nConfiguring read-only access...")
