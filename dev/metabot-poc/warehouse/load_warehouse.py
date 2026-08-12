@@ -28,11 +28,32 @@ HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parents[2]
 SQL_DIR = HERE / "sql"
 
-PIPELINE_DIR = Path(
-    os.getenv(
-        "WAREHOUSE_PIPELINE_DIR",
-        REPO_ROOT / "local-context" / "data" / "pipeline",
-    )
+
+def load_env_file(path=HERE.parent / ".env"):
+    """Read dev/metabot-poc/.env so the passwords live in one place.
+
+    Real environment variables win, which keeps CI and one-off overrides
+    working without editing the file.
+    """
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        os.environ.setdefault(key.strip(), value.strip())
+
+
+load_env_file()
+
+_pipeline = os.getenv("WAREHOUSE_PIPELINE_DIR")
+# Resolve a relative override against the repo root, not the shell's cwd, so
+# the script behaves the same whichever directory it is invoked from.
+PIPELINE_DIR = (
+    (REPO_ROOT / _pipeline).resolve()
+    if _pipeline
+    else REPO_ROOT / "local-context" / "data" / "pipeline"
 )
 
 DB_HOST = os.getenv("WAREHOUSE_HOST", "localhost")
