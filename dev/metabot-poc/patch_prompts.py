@@ -40,9 +40,19 @@ CACHE_DIR = HERE / ".cache"
 PRISTINE_JAR = CACHE_DIR / "metabase.pristine.jar"
 WORKING_JAR = CACHE_DIR / "metabase.patched.jar"
 
-PROMPT_ROOT = REPO_ROOT / "resources" / "metabot" / "prompts"
-# Path prefix inside the jar, mirroring the resources/ layout.
-JAR_PREFIX = "metabot/prompts/"
+# (directory in the working tree, prefix inside the jar, glob, recursive)
+#
+# Prompts were the original reason for this script. The frontend_client entries
+# were added for a different problem with the same shape: those files are
+# inlined into index.html and their SHA-256 is published in the CSP, so a stale
+# or CRLF copy in the jar takes the whole UI down, and rebuilding to fix one
+# line ending costs 40 minutes.
+RESOURCE_SETS = [
+    (REPO_ROOT / "resources" / "metabot" / "prompts", "metabot/prompts/", "*.selmer", True),
+    (REPO_ROOT / "resources" / "frontend_client" / "inline_js",
+     "frontend_client/inline_js/", "*.js", False),
+    (REPO_ROOT / "resources" / "frontend_client", "frontend_client/", "*.html", False),
+]
 
 CONTAINER = "metabot-poc-metabase-1"
 JAR_IN_CONTAINER = "/app/metabase.jar"
@@ -76,11 +86,14 @@ def ensure_pristine(refresh=False):
 
 
 def local_templates():
-    """Map jar entry name -> bytes for every prompt file in the working tree."""
+    """Map jar entry name -> bytes for every managed resource in the working tree."""
     out = {}
-    for path in sorted(PROMPT_ROOT.rglob("*.selmer")):
-        entry = JAR_PREFIX + path.relative_to(PROMPT_ROOT).as_posix()
-        out[entry] = path.read_bytes()
+    for root, prefix, pattern, recursive in RESOURCE_SETS:
+        if not root.exists():
+            continue
+        paths = root.rglob(pattern) if recursive else root.glob(pattern)
+        for path in sorted(paths):
+            out[prefix + path.relative_to(root).as_posix()] = path.read_bytes()
     return out
 
 
