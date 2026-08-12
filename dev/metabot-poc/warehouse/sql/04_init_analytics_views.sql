@@ -24,10 +24,15 @@ DROP VIEW IF EXISTS analytics.fact_events;
 -- -----------------------------------------------------------------------------
 -- Transactions
 -- -----------------------------------------------------------------------------
+-- transaction_date is TIMESTAMPTZ at midnight UTC. A bare ::DATE would resolve
+-- against the session time zone, so any connection west of UTC would shift
+-- every row back a day. Metabase sets the session zone from its report-timezone
+-- setting, so pin the conversion to UTC. transaction_month needs no such
+-- treatment: it arrives from Silver as a literal YYYY-MM string.
 CREATE VIEW analytics.fact_transactions AS
 SELECT
     t.transaction_id,
-    t.transaction_date::DATE AS transaction_date,
+    (t.transaction_date AT TIME ZONE 'UTC')::DATE AS transaction_date,
     t.transaction_month,
     t.company,
     t.pnl,
@@ -68,11 +73,15 @@ COMMENT ON COLUMN analytics.fact_transactions.global_customer_id IS
 -- -----------------------------------------------------------------------------
 -- Events
 -- -----------------------------------------------------------------------------
+-- Same UTC pinning as fact_transactions, and here it also covers event_month:
+-- Silver carries no month column for events, so it is derived. Verified: under
+-- America/Los_Angeles the unpinned version produced 13 month buckets and leaked
+-- 59 events into 2024-12.
 CREATE VIEW analytics.fact_events AS
 SELECT
     e.event_id,
-    e.event_date::DATE AS event_date,
-    TO_CHAR(e.event_date, 'YYYY-MM') AS event_month,
+    (e.event_date AT TIME ZONE 'UTC')::DATE AS event_date,
+    TO_CHAR(e.event_date AT TIME ZONE 'UTC', 'YYYY-MM') AS event_month,
     e.company,
     e.pnl,
     e.event_name,

@@ -3,8 +3,11 @@
 -- Contract Version: 0.3-mvp
 -- =============================================================================
 
--- Enable pgvector extension if available
-CREATE EXTENSION IF NOT EXISTS vector;
+-- The original file created the pgvector extension here for the retrieval and
+-- embedding tables in 02_init_retrieval.sql. This POC has no semantic search,
+-- no table below declares a vector column, and dropping the requirement lets
+-- the warehouse run on stock postgres:16-alpine instead of a pgvector image.
+-- Restore the CREATE EXTENSION line if embedding tables are ever added back.
 
 -- -----------------------------------------------------------------------------
 -- 1. BRONZE SCHEMA (Raw Ingestion)

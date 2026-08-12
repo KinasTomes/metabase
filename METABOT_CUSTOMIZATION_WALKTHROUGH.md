@@ -9,7 +9,7 @@ Mục tiêu ban đầu là **đọc và phân tích dữ liệu hiện có**. C�
 ## Workspace và phiên bản
 
 - Repository: `D:\Code\metabase`
-- Branch làm việc: `metabot-poc`
+- Branch làm việc: `master` (một người làm, không tách branch)
 - Fork cá nhân: `git@github.com:KinasTomes/metabase.git` (`origin`); upstream là `metabase/metabase`
 - Upstream: Metabase `v0.63.1.6` (`21a3686`)
 - Local data và tài liệu: `local-context/` (cố ý không được Git theo dõi)
