@@ -103,40 +103,51 @@ MetaBot tool -> internal tool service -> approved external API
 
 ## Kế hoạch thực hiện
 
-### Phase 1 — Chạy nền tảng
+Toàn bộ code và tài liệu của POC nằm ở [dev/metabot-poc/](dev/metabot-poc/).
 
-Hai việc đầu (đọc luồng provider/model, xác định feature gate) đã xong — kết quả ở mục "Hiện trạng upstream" phía trên. Còn lại:
+### Phase 1 — Chạy nền tảng — XONG
 
-- Dựng Metabase local với metadata database tách biệt.
-- Set `MB_LLM_METABOT_PROVIDER` và API key của provider đã chọn qua env.
-- Nạp database/warehouse chứa các Gold/serving tables.
+- `dev/metabot-poc/compose.yml`: Metabase build từ source (EE, không license), app DB
+  riêng, warehouse Postgres riêng.
+- Provider cấu hình qua env; đã chạy thử `openai/qd/qmodel_38max` và
+  `anthropic/claude-opus-4-8` qua gateway tương thích.
+- `dev/metabot-poc/warehouse/`: DDL, loader từ CSV Silver/Gold, và role read-only
+  `metabase_reader` chỉ thấy schema `analytics`.
 
-**Kết quả mong đợi:** đăng nhập được Metabase local, thấy model/metric/collection mẫu và MetaBot trả lời được một câu hỏi bất kỳ, chưa đụng production.
+### Phase 2 — Semantic layer cho dữ liệu BI — XONG
 
-### Phase 2 — Semantic layer cho dữ liệu BI
+- Hai view fact-grain `analytics.fact_transactions` (31.685 dòng) và
+  `analytics.fact_events` (40.000 dòng), thay hai view monthly-aggregate cũ vốn chỉ
+  đáp ứng 5/13 câu hỏi demo.
+- Mọi view và cột đều có `COMMENT ON` mang thuật ngữ tiếng Việt. Metabase sync thành
+  field description, và MetaBot đọc được qua tool `get-tables`.
+- Collection `BI Analytics` với 3 metric: Doanh thu, Số giao dịch, Số event.
+- `dev/metabot-poc/provision_metabase.py` làm toàn bộ việc này, idempotent.
 
-- Chuẩn hóa tên bảng, cột, mô tả và quan hệ trong Metabase.
-- Tạo models/questions/metrics từ Gold và serving datasets.
-- Gom nội dung đáng tin cậy vào collection dành cho chatbot.
-- Viết bộ câu hỏi kiểm thử bằng tiếng Việt và tiếng Anh.
+**Bằng chứng:** [BASELINE.md](dev/metabot-poc/BASELINE.md) — 33/35 lượt đo đạt.
 
-**Kết quả mong đợi:** MetaBot hiểu business terms và sinh câu trả lời đúng từ dữ liệu đã kiểm duyệt.
+### Phase 3 — Tùy biến chatbot — QUYẾT ĐỊNH KHÔNG LÀM
 
-### Phase 3 — Tùy biến chatbot
+Cần license `:ai-controls` cho `metabot-*-system-prompt`, `metabot-name`,
+`metabot-icon`. Đường vòng hợp lệ duy nhất là sửa Selmer template trong
+`resources/metabot/prompts/` rồi tự build — **không** gỡ `:feature` khỏi
+`defsetting`, vì đó là vô hiệu hoá license check.
 
-Phần lớn không cần code, nhưng **cần license `:ai-controls`** (xem bảng feature gate).
+Đã dựng công cụ cho đường này (`dev/metabot-poc/patch_prompts.py`, vòng lặp ~70 giây
+thay vì rebuild 17 phút) và lên plan chi tiết
+([PLAN_PHASE3_FORK.md](dev/metabot-poc/PLAN_PHASE3_FORK.md)), nhưng **dừng lại**:
 
-- System prompt: set `metabot-chat-system-prompt`, `metabot-nlq-system-prompt`, `metabot-sql-system-prompt`.
-- Branding: `metabot-name`, `metabot-icon`, `metabot-show-illustrations`.
-- Giới hạn phạm vi dữ liệu và suggested prompts.
-- Thêm policy rõ ràng cho SQL generation, chart/table response và fallback khi không đủ dữ liệu.
-- Ghi nhận feedback, query đã dùng và token usage để đánh giá chất lượng — `src/metabase/metabot/feedback.clj` và `usage.clj` đã có sẵn.
+- Bộ 13 câu số đã 13/13 nên không còn chỗ đo cải thiện.
+- Bộ 8 câu khó cũng 8/8 — MetaBot vốn đã nêu giới hạn đúng mà không cần prompt riêng.
 
-Nếu không có license, phải sửa trực tiếp trong `src/metabase/metabot/` (prompt template ở `tmpl.clj`, context ở `context.clj`) và tự build image.
+**Kết luận của Phase 3: với dataset này, semantic layer quan trọng hơn prompt
+engineering.** `COMMENT ON` trên view và cột làm được gần hết việc mà system prompt
+tuỳ biến định làm — MetaBot tự phát hiện doanh thu VinFast bằng 0, tự nêu khoảng dữ
+liệu 2025, tự cảnh báo mọi dòng đều `completed`, đều chỉ nhờ mô tả cột.
 
-**Kết quả mong đợi:** chatbot trả lời ổn định cho nhóm câu hỏi BI ưu tiên, không lộ dữ liệu ngoài quyền người dùng.
+### Phase 4 — Tool/API ngoài — KHÔNG THỰC HIỆN
 
-### Phase 4 — Tool/API ngoài (chỉ khi có use case cụ thể)
+Chưa có use case cụ thể. Giữ lại phần dưới đây làm ghi chú cho lần sau.
 
 - Xác định API và action được phép.
 - Xây tool service riêng, server-side only.
@@ -145,20 +156,40 @@ Nếu không có license, phải sửa trực tiếp trong `src/metabase/metabot
 
 **Kết quả mong đợi:** chatbot chỉ gọi được API đã duyệt, có trace đầy đủ và không nhận endpoint/API key từ prompt người dùng.
 
-## Definition of done cho POC đầu tiên
+## Definition of done cho POC đầu tiên — ĐẠT
 
-- Chạy được Metabase local bằng source/image tự build.
-- Có một provider LLM test key qua biến môi trường/secret store.
-- Nạp được một tập Gold/serving data vào database phù hợp.
-- Có ít nhất 10 câu hỏi acceptance test và kết quả mong đợi.
-- MetaBot trả lời đúng dữ liệu, tôn trọng quyền đọc và không sinh action ghi dữ liệu.
-- Không có data local hoặc secret trong `git status`/commit.
+| Tiêu chí | Trạng thái |
+| --- | --- |
+| Chạy Metabase local bằng image tự build | ✅ `dev/metabot-poc/compose.yml`, build từ source EE |
+| Provider LLM qua biến môi trường | ✅ `MB_LLM_METABOT_PROVIDER` + `MB_LLM_*_API_KEY` |
+| Nạp Gold/serving data | ✅ 97.085 dòng Silver/Gold, expose qua 2 view `analytics` |
+| ≥10 câu acceptance test có kết quả mong đợi | ✅ 13 câu số + 8 câu khó, ground truth ở [EXPECTED_RESULTS.md](dev/metabot-poc/EXPECTED_RESULTS.md) |
+| Trả lời đúng, tôn trọng quyền đọc, không ghi dữ liệu | ✅ 33/35 lượt đo đạt; `metabase_reader` bị từ chối trên `silver`/`gold`/`bronze` và mọi thao tác ghi |
+| Không có data hoặc secret trong commit | ✅ `local-context/` ngoài Git, `.env` gitignore |
 
-## Quyết định cần chốt trước khi code tính năng
+## Quyết định đã chốt
 
-1. **Có license EE (`:ai-controls`) không?** Quyết định Phase 3 làm bằng setting hay phải fork code và tự build image.
-2. Database/warehouse nào sẽ là data source cho POC? `local-context/integration/` đã có `docker-compose.yml` và `scripts__sql__04_init_metabase_views.sql`, cần xem lại trước khi dựng mới.
-3. Provider LLM nào dùng cho môi trường test? (8 provider đã hỗ trợ sẵn, chọn 1.)
-4. Nhóm câu hỏi BI ưu tiên đầu tiên là gì?
-5. Có cần API/tool ngoài ngay POC hay chỉ chatbot trên dữ liệu Metabase?
+1. **License EE:** không có. Phase 3 vì thế bị chặn, và cuối cùng quyết định không làm.
+2. **Data source:** Postgres riêng, nạp từ `local-context/data/pipeline/` (Silver + Gold).
+   View cũ trong `scripts__sql__04_init_metabase_views.sql` bị thay vì chỉ đáp ứng 5/13
+   câu hỏi.
+3. **Provider:** gateway tương thích OpenAI/Anthropic chạy local. Đã dùng
+   `openai/qd/qmodel_38max` rồi `anthropic/claude-opus-4-8`.
+4. **Nhóm câu hỏi ưu tiên:** doanh thu, số giao dịch, số event — theo tháng, tỉnh,
+   sản phẩm, tên sự kiện.
+5. **Tool/API ngoài:** không cần. Phase 4 không thực hiện.
+
+## Tài liệu POC
+
+| File | Nội dung |
+| --- | --- |
+| [dev/metabot-poc/README.md](dev/metabot-poc/README.md) | Dựng và chạy stack |
+| [BUILD_GUIDE.md](dev/metabot-poc/BUILD_GUIDE.md) | Build image từ source |
+| [warehouse/README.md](dev/metabot-poc/warehouse/README.md) | Warehouse, view, phân quyền |
+| [DEMO_QUESTIONS.md](dev/metabot-poc/DEMO_QUESTIONS.md) | 13 câu demo |
+| [EXPECTED_RESULTS.md](dev/metabot-poc/EXPECTED_RESULTS.md) | Ground truth |
+| [BASELINE.md](dev/metabot-poc/BASELINE.md) | Baseline 3 lượt |
+| [HARD_QUESTIONS.md](dev/metabot-poc/HARD_QUESTIONS.md) | 8 câu khó, chấm hành vi |
+| [NEXT_STEPS.md](dev/metabot-poc/NEXT_STEPS.md) | Việc còn lại |
+| [PLAN_PHASE3_FORK.md](dev/metabot-poc/PLAN_PHASE3_FORK.md) | Plan fork prompt (chưa thực hiện) |
 
