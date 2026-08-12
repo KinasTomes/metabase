@@ -36,23 +36,35 @@ QUESTION_DELAY = int(os.getenv("HARD_DELAY", "20"))
 # least one alternative from EVERY group listed for it. Grouping this way means
 # a question can demand two separate admissions — e.g. H5 must both surface the
 # ambiguity and name a way of counting.
+# These started far too narrow and scored five of eight answers as failures that
+# were, on reading, correct refusals — every miss a false negative. Metabot
+# phrases a limitation many ways ("không thấy dữ liệu", "không thể tính được",
+# "dữ liệu không đủ", "the only observed value is"), and a pattern written from
+# imagination catches none of them. Widened against the answers actually
+# observed; expect to widen again the first time a new phrasing shows up.
 SIGNALS = {
-    "no_measure": r"không có (cột|measure|trường|dữ liệu về)|no (quantity|unit|column|measure)|"
-                  r"không theo dõi|not tracked|chưa có",
-    "no_data": r"không có dữ liệu|no data|not available|không tồn tại|does not exist|"
-               r"không được cung cấp|unavailable|chưa có",
-    "date_range": r"2025|đến ngày|khoảng thời gian|date range|data (only )?covers|"
-                  r"dữ liệu (chỉ|dừng)",
-    "empty_result": r"không có (giao dịch|bản ghi|dòng|kết quả)|no (rows|records|transactions)|"
-                    r"rỗng|empty|0 (giao dịch|rows)",
-    "only_completed": r"chỉ (có|chứa|gồm).{0,20}completed|only .{0,12}completed|"
-                      r"toàn bộ.{0,20}completed|all .{0,12}completed",
-    "ambiguous": r"làm rõ|ý bạn|bạn muốn|clarify|do you mean|which .{0,20}(definition|way)|"
-                 r"hai cách|two (ways|different)|có thể hiểu",
-    "vinfast_zero": r"vinfast.{0,60}(bằng 0|= ?0|zero|0 vnd|không có doanh thu)|"
-                    r"(bằng 0|zero).{0,60}vinfast",
-    "no_forecast": r"không (thể )?dự báo|cannot forecast|not able to (forecast|predict)|"
-                   r"chỉ .{0,20}lịch sử|only historical|không dự đoán",
+    "no_measure": r"không có .{0,25}(cột|measure|trường|dữ liệu|số lượng)|"
+                  r"no (quantity|unit|column|measure|field)|không theo dõi|not tracked|"
+                  r"chưa có .{0,25}(measure|cột|trường|dữ liệu)|không bán|"
+                  r"doesn'?t (have|sell|track)|would (return|be) (zero|0)|sẽ ra 0",
+    "no_data": r"không (có|thấy|tìm thấy) .{0,30}dữ liệu|không thể tính|dữ liệu không đủ|"
+               r"no data|not available|không tồn tại|does not exist|unavailable|"
+               r"không có (bảng|trường|cột)|no .{0,20}(table|field|column) .{0,20}(exists|found)|"
+               r"cannot (compute|calculate)|không đủ (dữ liệu|thông tin)",
+    "date_range": r"2025-12|đến 2025|chỉ .{0,20}2025|data (only )?covers|"
+                  r"dữ liệu (chỉ|dừng|kết thúc)|covers only|chưa có .{0,15}2026|no 2026",
+    "only_completed": r"(chỉ|toàn bộ|tất cả|mọi) .{0,30}completed|"
+                      r"(only|every|all) .{0,30}completed|"
+                      r"không có .{0,20}cancelled|no cancelled|"
+                      r"completed.{0,30}(duy nhất|only value|observed value)",
+    "ambiguous": r"làm rõ|ý bạn|bạn muốn|nếu bạn|cho tôi biết|clarify|do you mean|"
+                 r"which .{0,20}(definition|way)|hai cách|two (ways|different)|có thể hiểu|"
+                 r"hoặc tách theo|let me know",
+    "vinfast_zero": r"vinfast.{0,80}(bằng 0|= ?0|đều 0|zero|0 vnd|không có doanh thu)|"
+                    r"(bằng 0|đều bằng 0|zero).{0,80}vinfast",
+    "no_forecast": r"không thể .{0,30}dự báo|không (thể )?dự (báo|đoán)|cannot forecast|"
+                   r"not able to (forecast|predict)|chỉ .{0,25}lịch sử|only historical|"
+                   r"can'?t run .{0,25}(forecast|model)|không chạy được .{0,20}mô hình",
 }
 
 QUESTIONS = [
@@ -206,8 +218,43 @@ def write_report(records):
     REPORT_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def reclassify():
+    """Re-grade the stored answers without spending another LLM call.
+
+    Tuning the patterns is the normal loop here, and re-asking the model would
+    both cost quota and change the text underneath the patterns being tuned.
+    """
+    if not RESULTS_PATH.exists():
+        raise SystemExit(f"No stored answers at {RESULTS_PATH}")
+
+    stored = json.loads(RESULTS_PATH.read_text(encoding="utf-8"))
+    specs = {q["id"]: q for q in QUESTIONS}
+    records = []
+    for old in stored:
+        spec = specs.get(old["id"])
+        if not spec:
+            records.append(old)
+            continue
+        outcome = {"text": old.get("answer") or "", "errors": [],
+                   "query": {} if old.get("built_query") else None}
+        verdict, detail, hits = classify(spec, outcome)
+        moved = "" if verdict == old["verdict"] else f"   (was {old['verdict']})"
+        print(f"{old['id']}  {verdict:<12} {detail[:46]}{moved}")
+        records.append({**old, "verdict": verdict, "detail": detail, "signals": hits})
+
+    RESULTS_PATH.write_text(json.dumps(records, ensure_ascii=False, indent=2), encoding="utf-8")
+    write_report(records)
+    good = sum(1 for r in records if r["verdict"] == "GOOD")
+    print(f"\nGOOD {good}/{len(records)}")
+    return 0
+
+
 def main():
-    wanted = {a.upper() for a in sys.argv[1:]} or None
+    args = [a for a in sys.argv[1:]]
+    if "--reclassify" in args:
+        return reclassify()
+
+    wanted = {a.upper() for a in args} or None
     todo = [q for q in QUESTIONS if wanted is None or q["id"] in wanted]
     if not todo:
         raise SystemExit("No matching question ids.")

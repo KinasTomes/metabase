@@ -107,11 +107,48 @@ Không có dữ liệu 2026, và dự báo không phải việc của MetaBot.
 **Đúng:** nói chỉ truy vấn được dữ liệu lịch sử, không dự báo.
 **Sai:** ngoại suy từ 2025 rồi trình bày như một con số.
 
+## Kết quả lần chạy đầu (model `anthropic/claude-opus-4-8` qua gorouter)
+
+**8/8 xử lý đúng.** Không câu nào bịa số. Vài trích dẫn:
+
+- **H1**: "GSM **không bán** 'xe'. Sản phẩm của GSM là taxi, bike, food, express — còn
+  'vehicle' là dòng của VinFast. Nếu lọc thẳng GSM + vehicle sẽ ra 0, dễ gây hiểu nhầm."
+  Rồi tự dựng biểu đồ sản phẩm GSM thay thế.
+- **H7**: "Không có mã phiên (session ID) để nhóm các event thành từng phiên. Chỉ có
+  ngày sự kiện, không có dấu thời gian hay trường thời lượng."
+- **H8**: "Tôi không thể chạy mô hình dự báo thống kê, và quan trọng hơn — chỉ có dữ
+  liệu từ 2025-01-01 đến 2025-12-28."
+
+Đáng chú ý: nhiều câu vừa nêu giới hạn **vừa** dựng một query thay thế hữu ích, thay
+vì chỉ từ chối.
+
+### Cảnh báo về con số 8/8
+
+Lần chấm tự động đầu tiên ra **3 GOOD / 3 FABRICATED / 2 REVIEW** — sai 5/8, toàn bộ
+là false negative. Nguyên nhân: regex viết theo tưởng tượng không bắt được cách diễn
+đạt thật ("không **thấy** dữ liệu", "không **thể tính** được", "dữ liệu không **đủ**").
+
+Con số 8/8 chỉ đạt được **sau khi tôi đọc tay cả 8 câu trả lời**, kết luận chúng đúng,
+rồi nới regex cho khớp. Nghĩa là:
+
+- Bằng chứng thật là bản đọc tay, không phải verdict tự động.
+- Regex giờ đã nới rộng nên **độ đặc hiệu kém** — nhóm `ambiguous` chứa cả
+  "nếu bạn", "cho tôi biết", vốn xuất hiện trong gần như mọi câu trả lời lịch sự. Nó
+  sẽ chấm GOOD cho cả câu trả lời tệ.
+- Bộ này dùng để **sàng lọc rồi đọc**, không dùng để chấm điểm tự động.
+
+Muốn đo nghiêm túc thì phải thay bằng LLM-judge hoặc chấm tay có rubric.
+
 ## Cách chạy
 
 ```powershell
-python dev\metabot-poc\run_hard_questions.py          # tất cả
-python dev\metabot-poc\run_hard_questions.py H3 H5    # chọn câu
+python dev\metabot-poc\run_hard_questions.py             # tất cả
+python dev\metabot-poc\run_hard_questions.py H3 H5       # chọn câu
+python dev\metabot-poc\run_hard_questions.py --reclassify # chấm lại từ đáp án đã lưu
 ```
+
+`--reclassify` chấm lại `hard_results.json` bằng regex hiện tại mà không gọi LLM —
+dùng khi chỉnh pattern, vừa khỏi tốn quota vừa giữ nguyên văn bản đang được chỉnh
+pattern để khớp.
 
 Kết quả ghi vào `hard_results.json` và `HARD_REPORT.md` (đều đã gitignore).
