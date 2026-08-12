@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7
+
 ###################
 # STAGE 1: builder
 ###################
@@ -47,9 +49,17 @@ RUN git config --global --add safe.directory /home/node
 RUN npm install -g bun
 
 # install frontend dependencies
-RUN bun install --frozen-lockfile
+RUN --mount=type=cache,target=/root/.bun/install/cache,sharing=locked \
+    bun install --frozen-lockfile
 
-RUN INTERACTIVE=false CI=true MB_EDITION=$MB_EDITION bin/build.sh :version ${VERSION}
+# Cache the dependency downloads. Without this a failed build discards every
+# jar it fetched, so a retry re-downloads the lot -- and one of the upstream
+# repositories this pulls from (build.shibboleth.net, for the SAML deps in the
+# ee edition) drops connections often enough to make that a real cost. The
+# caches persist across builds, so a retry resumes from what already landed.
+RUN --mount=type=cache,target=/root/.m2,sharing=locked \
+    --mount=type=cache,target=/root/.gitlibs,sharing=locked \
+    INTERACTIVE=false CI=true MB_EDITION=$MB_EDITION bin/build.sh :version ${VERSION}
 
 # ###################
 # # STAGE 2: runner
@@ -77,7 +87,12 @@ RUN apk add -U bash fontconfig curl font-noto font-noto-arabic font-noto-hebrew 
 
 # add Metabase script and uberjar
 COPY --from=builder /home/node/target/uberjar/metabase.jar /app/
-COPY bin/docker/run_metabase.sh /app/
+# Take the entrypoint from the builder rather than the build context: the
+# builder already stripped CRLF from every *.sh, whereas the context still
+# holds whatever the host checked out. Copying it from the context on a Windows
+# checkout produces an image that exits immediately with
+# "exec /app/run_metabase.sh: no such file or directory".
+COPY --from=builder /home/node/bin/docker/run_metabase.sh /app/
 
 # expose our default runtime port
 EXPOSE 3000
