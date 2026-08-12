@@ -66,6 +66,8 @@ services:
       MB_LLM_ANTHROPIC_API_KEY: ${MB_LLM_ANTHROPIC_API_KEY:-}
       MB_LLM_ANTHROPIC_API_BASE_URL: ${MB_LLM_ANTHROPIC_API_BASE_URL:-https://api.anthropic.com}
 
+      MB_LLM_MAX_TOKENS: ${MB_LLM_MAX_TOKENS:-4096}
+
       MB_LLM_OPENAI_API_KEY: ${MB_LLM_OPENAI_API_KEY:-}
       MB_LLM_OPENAI_API_BASE_URL: ${MB_LLM_OPENAI_API_BASE_URL:-https://api.openai.com}
     depends_on:
