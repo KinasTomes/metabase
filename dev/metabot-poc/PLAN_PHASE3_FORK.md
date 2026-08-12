@@ -77,11 +77,35 @@ không đủ.
 
 ## Các bước
 
-### Bước 1 — Dựng công cụ iterate
-Viết `patch_prompts.py` theo vòng lặp trên. Kiểm chứng bằng một thay đổi vô hại
-(đổi một từ trong `personality.selmer`) rồi xác nhận nó xuất hiện trong câu trả lời.
+### Bước 1 — Dựng công cụ iterate — XONG
 
-Không có bước này thì mọi bước sau đều đắt gấp mười.
+`patch_prompts.py` đã có. Vòng lặp mất ~70 giây (rewrite jar 66s + restart).
+
+```powershell
+python dev\metabot-poc\patch_prompts.py --dry-run           # xem gì khác
+python dev\metabot-poc\patch_prompts.py --only personality  # patch có chọn lọc
+python dev\metabot-poc\patch_prompts.py --restore           # về jar gốc
+```
+
+**Phát hiện chặn đường: image đang chạy không build từ HEAD.** Nó cũ hơn commit
+`62cdfb57c2`; 10 template khác với working tree, và `explorations.selmer` chưa hề
+tồn tại trong jar. Patch bừa từ tree sẽ kéo theo thay đổi upstream không liên quan,
+và nguy hiểm hơn — template mới có thể tham chiếu biến render-context mà
+`prompts.clj` cũ trong jar không cung cấp. Tool mặc định **từ chối** patch khi thấy
+nhiều file lệch; phải dùng `--only`.
+
+Trước khi làm bước 3 nên **rebuild image từ master** để tree và jar khớp nhau. Không
+rebuild thì mọi chỉnh sửa prompt đều phải patch từng file một qua `--only`, và luôn
+có rủi ro lệch phiên bản giữa template và code.
+
+**Cách verify đã dùng:** cắm marker vào prompt rồi hỏi model thì *không* kết luận
+được — model bỏ qua chỉ thị mềm, kể cả `MANDATORY: begin every reply with...`. Cách
+chứng minh được: đặt cú pháp Selmer sai rồi xem `selmer.parser$render` nổ trong
+server log. Build production không lưu prompt đã render và `debug` bị gate bởi
+`config/is-dev?`, nên đây là bằng chứng khả dụng duy nhất.
+
+Điều này cũng là dữ kiện cho bước 3: `qmodel_38max` phớt lờ chỉ thị mềm trong khối
+personality. Đừng kỳ vọng nhiều vào prompt engineering với model này.
 
 ### Bước 2 — Chụp baseline
 Chạy acceptance suite 3 lượt với template gốc, ghi lại tỉ lệ pass từng câu. Không có
