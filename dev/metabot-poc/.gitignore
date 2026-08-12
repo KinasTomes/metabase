@@ -5,3 +5,7 @@ acceptance_run.log
 ACCEPTANCE_REPORT.md
 acceptance_results.*.json
 .cache/
+hard_results.json
+HARD_REPORT.md
+baseline-run*.json
+acceptance_run*.log
