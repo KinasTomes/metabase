@@ -134,6 +134,10 @@ def call_llm(payload, model, retry_note=None):
         raise SystemExit(f"gateway HTTP {e.code}: {e.read().decode()[:300]}")
     except urllib.error.URLError as e:
         raise SystemExit(f"gateway unreachable: {e.reason}")
+    except TimeoutError:
+        # socket/SSL read timeouts escape urllib as TimeoutError rather than
+        # URLError. Normalize them so run_nightly can degrade to the raw table.
+        raise SystemExit("gateway timed out after 120 seconds")
     return data["choices"][0]["message"]["content"].strip()
 
 

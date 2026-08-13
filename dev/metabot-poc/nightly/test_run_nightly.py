@@ -45,6 +45,23 @@ class PublishedStateTest(unittest.TestCase):
         self.assertFalse(run_nightly.already_sent(sample_report()))
 
 
+class NarrationGatewayTest(unittest.TestCase):
+    def test_read_timeout_becomes_a_degradable_gateway_error(self):
+        with (
+            mock.patch.dict("os.environ", {
+                "MB_LLM_OPENROUTER_API_BASE_URL": "https://gateway.invalid",
+                "MB_LLM_OPENROUTER_API_KEY": "test-key",
+            }),
+            mock.patch.object(
+                run_nightly.narrate.urllib.request,
+                "urlopen",
+                side_effect=TimeoutError,
+            ),
+        ):
+            with self.assertRaisesRegex(SystemExit, "gateway timed out"):
+                run_nightly.narrate.call_llm("payload", "model")
+
+
 class OneCycleTest(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
