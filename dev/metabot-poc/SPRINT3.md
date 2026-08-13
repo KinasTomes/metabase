@@ -216,6 +216,7 @@ python scan.py --schema analytics --backtest         # hiệu chuẩn lại ngư
 python run_nightly.py --as-of 2025-12                # một chu kỳ đầy đủ
 python run_nightly.py --sink file                    # không gửi Slack
 python check_labels.py                               # chấm lại bộ dò
+python -m unittest discover -s . -p "test_*.py"       # kiểm orchestration/sink
 ```
 
 ### Chạy tự động
@@ -228,6 +229,13 @@ docker compose logs -f nightly
 Mặc định 02:00 UTC, đổi bằng `NIGHTLY_AT` trong `.env`. Container `restart:
 unless-stopped`, và một đêm lỗi không làm chết lịch — `run_nightly.py` bắt exception
 rồi ngủ tiếp.
+
+Scheduler không gửi lại cùng một tập phát hiện mỗi đêm. Sau khi Slack trả thành công,
+job ghi chữ ký dữ liệu vào `nightly/out/.last-published.json`; chữ ký gồm schema, kỳ,
+ID và các số đo của finding, không gồm câu văn hay URL. Vì vậy đổi cách diễn đạt không
+được coi là tin mới, nhưng số liệu cùng kỳ được hiệu chỉnh thì vẫn gửi lại. File trạng
+thái nằm trên bind mount nên còn nguyên khi container restart. Chạy tay luôn bỏ qua cơ
+chế chống lặp để demo và kiểm thử vẫn tái lập được.
 
 ### Dựng lại fixture
 
@@ -246,7 +254,7 @@ CSV (~530 MB) bị gitignore; `labels.json` là hợp đồng và được commi
 | --- | --- |
 | Gateway LLM | mất phần văn xuôi, vẫn gửi bảng số |
 | Metabase | mất link drill-down, vẫn gửi báo cáo |
-| Slack | vẫn ghi file `out/summary-YYYY-MM.md` |
+| Slack | vẫn ghi file `out/summary-YYYY-MM.md`, không đánh dấu là đã gửi; đêm sau thử lại |
 | Warehouse | **dừng hẳn**, báo lỗi rõ |
 
 ### Đổi ngưỡng
