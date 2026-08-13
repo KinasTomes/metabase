@@ -245,6 +245,83 @@ def sync_and_wait(db_id, timeout=300):
     )
 
 
+def warehouse_comments():
+    """Read the live COMMENT ON text straight from Postgres.
+
+    Metabase is not a reliable mirror of it. Sync copies a comment when it first
+    discovers a column and then leaves the description alone, so every edit to
+    an existing column is silently dropped -- `status` still read "Every row in
+    this dataset is 'completed'" long after that sentence was rewritten, and
+    verify_descriptions passed the whole time because it only asked whether a
+    description existed, not whether it matched.
+
+    Returns {(table, column): comment} plus {(table, None): table comment}.
+    """
+    import psycopg2  # local: only this step needs a warehouse connection
+
+    conn = psycopg2.connect(
+        host=os.getenv("WAREHOUSE_HOST", "localhost"),
+        port=int(os.getenv("WAREHOUSE_PORT", "5433")),
+        dbname=WAREHOUSE_DB,
+        user=os.getenv("WAREHOUSE_USER", "postgres"),
+        password=os.getenv("WAREHOUSE_PASSWORD"),
+    )
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT c.relname, a.attname,
+                       col_description(c.oid, a.attnum)
+                FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0
+                WHERE n.nspname = 'analytics' AND NOT a.attisdropped
+            """)
+            out = {(t, col): txt for t, col, txt in cur.fetchall() if txt}
+            cur.execute("""
+                SELECT c.relname, obj_description(c.oid)
+                FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = 'analytics'
+            """)
+            out.update({(t, None): txt for t, txt in cur.fetchall() if txt})
+            return out
+    finally:
+        conn.close()
+
+
+def push_descriptions(tables):
+    """Force Metabase's descriptions to match the warehouse comments.
+
+    Making the warehouse authoritative is the whole premise of this POC -- the
+    comments are the only channel into the model -- so they cannot be left to a
+    sync step that treats the first value it saw as final.
+    """
+    print("Pushing warehouse comments into Metabase...")
+    try:
+        comments = warehouse_comments()
+    except Exception as exc:  # noqa: BLE001 - surfaced, not swallowed
+        raise ProvisionError(
+            f"Could not read comments from the warehouse: {exc}\n"
+            "Set WAREHOUSE_PASSWORD, or run this where localhost:5433 reaches it."
+        ) from None
+
+    updated = 0
+    for name, table in sorted(tables.items()):
+        want = comments.get((name, None))
+        if want and (table.get("description") or "") != want:
+            call("PUT", f"/table/{table['id']}", {"description": want})
+            updated += 1
+        for field in table.get("fields", []):
+            want = comments.get((name, field["name"]))
+            if want and (field.get("description") or "") != want:
+                call("PUT", f"/field/{field['id']}", {"description": want})
+                field["description"] = want
+                updated += 1
+
+    print(f"  {updated} description(s) refreshed" if updated else "  already current")
+    return updated
+
+
 def verify_descriptions(tables):
     """The whole COMMENT ON strategy rests on this actually having synced."""
     print("Verifying descriptions reached Metabase...")
@@ -430,6 +507,7 @@ def main():
     authenticate()
     db_id = ensure_database()
     tables = sync_and_wait(db_id)
+    push_descriptions(tables)
     described = verify_descriptions(tables)
     fk_count = ensure_fk_metadata(tables)
     collection_id = ensure_collection()
