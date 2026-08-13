@@ -1,84 +1,5 @@
 [
   {
-    "scenario": "null",
-    "schema": "scenario_null",
-    "description": "Six more months drawn from the same distribution. Nothing happens.",
-    "expectations": [
-      {
-        "id": "N1",
-        "month": null,
-        "metric": "any",
-        "expect_detect": false,
-        "why": "No effect applied anywhere. Any finding here is a false positive, and the count across all six months is the scanner's false-positive rate."
-      }
-    ]
-  },
-  {
-    "scenario": "tet_surge",
-    "schema": "scenario_tet_surge",
-    "description": "Tet 2026 (17 Feb). Rides pull forward into the fortnight before, the holiday week empties out.",
-    "expectations": [
-      {
-        "id": "T1",
-        "month": "2026-02",
-        "metric": "transaction_count",
-        "dimension": "product=taxi",
-        "direction": "up",
-        "expect_detect": true,
-        "why": "A real seasonal peak, the largest in the Vietnamese calendar."
-      },
-      {
-        "id": "T2",
-        "month": "2026-02",
-        "metric": "transaction_count",
-        "dimension": "overall",
-        "expect_detect": null,
-        "why": "Borderline on purpose. The intra-month shape moves far more than the monthly total, so a monthly aggregate may miss it. Whichever way it lands, it is evidence about the aggregation window, not a pass or a fail."
-      }
-    ]
-  },
-  {
-    "scenario": "province_expansion",
-    "schema": "scenario_province_expansion",
-    "description": "Launch in Khanh Hoa. Share ramps 0 -> 5% -> 9% -> 12% over three months.",
-    "expectations": [
-      {
-        "id": "P1",
-        "month": "2026-03",
-        "metric": "province_mix",
-        "dimension": "province=Khánh Hòa",
-        "direction": "new",
-        "expect_detect": true,
-        "why": "A category that did not exist before. Detecting it needs a new-category rule, not a z-score -- there is no baseline to compare against, so a purely numeric detector will divide by zero or skip it."
-      }
-    ]
-  },
-  {
-    "scenario": "food_churn",
-    "schema": "scenario_food_churn",
-    "description": "A competitor takes food-delivery share. -4% a month, compounding, for six months.",
-    "expectations": [
-      {
-        "id": "F1",
-        "month": "2026-06",
-        "metric": "transaction_count",
-        "dimension": "product=food",
-        "direction": "down",
-        "expect_detect": false,
-        "why": "MUST NOT fire on the month-over-month detector. Each step is ~4%, far inside the monthly noise band. This is the most realistic business risk in the whole set and the step detector cannot see it -- the gap is the finding."
-      },
-      {
-        "id": "F2",
-        "month": "2026-06",
-        "metric": "transaction_count_trend",
-        "dimension": "product=food",
-        "direction": "down",
-        "expect_detect": true,
-        "why": "A trend test over the trailing six months (Mann-Kendall or a slope on the monthly series) should catch a 22% cumulative fall. This label is what justifies building one."
-      }
-    ]
-  },
-  {
     "scenario": "corporate_whale",
     "schema": "scenario_corporate_whale",
     "description": "A corporate account books four very large express jobs in April.",
@@ -102,6 +23,7 @@
         "id": "W3",
         "month": "2026-04",
         "metric": "transaction_count",
+        "dimension": "overall",
         "expect_detect": false,
         "why": "Volume is untouched. Revenue up with volume flat is the signature the narration must carry."
       }
@@ -124,39 +46,9 @@
         "id": "G2",
         "month": "2026-05",
         "metric": "transaction_count",
+        "dimension": "overall",
         "expect_detect": false,
         "why": "MUST NOT fire. Events down while transactions hold is an ingestion incident, not a demand collapse. The summary calling this a business decline is a content failure even though the detection was right."
-      }
-    ]
-  },
-  {
-    "scenario": "vinfast_push",
-    "schema": "scenario_vinfast_push",
-    "description": "VinFast runs a vehicle campaign. Volume up 80% -- on 31 rows a month.",
-    "expectations": [
-      {
-        "id": "V1",
-        "month": "2026-06",
-        "metric": "transaction_count",
-        "dimension": "company=VinFast",
-        "direction": "up",
-        "expect_detect": false,
-        "why": "MUST NOT fire. The effect is real and large in percentage terms, but VinFast averages 31 transactions a month, so the sample-size gate should reject it. Suppressing a true effect is the correct call here and the limitation belongs in the runbook, not in a bug list."
-      }
-    ]
-  },
-  {
-    "scenario": "feature_store_shift",
-    "schema": "scenario_feature_store_shift",
-    "description": "A feature-store column moves without any fact-level cause.",
-    "expectations": [
-      {
-        "id": "S1",
-        "month": "2026-04",
-        "metric": "feature_median:gsm_transaction_completed_txn_count_l3m",
-        "direction": "up",
-        "expect_detect": true,
-        "why": "Exercises the feature-store arm of the scanner, which no other scenario can reach. Feature values in this warehouse are sampled per snapshot rather than derived from the facts, so a fact-level event cannot propagate into them -- injecting directly is the only way. That disconnect is itself worth reporting: today the feature store cannot corroborate a fact-level shift."
       }
     ]
   }

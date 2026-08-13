@@ -39,6 +39,7 @@
       "id": "G2",
       "month": "2026-05",
       "metric": "transaction_count",
+      "dimension": "overall",
       "expect_detect": false,
       "why": "MUST NOT fire. Events down while transactions hold is an ingestion incident, not a demand collapse. The summary calling this a business decline is a content failure even though the detection was right."
     }
@@ -46,48 +47,48 @@
   "injected_summary": {
     "transactions": {
       "2026-01": {
-        "rows": 2678,
-        "revenue": 74243908.62
+        "rows": 2785,
+        "revenue": 64917712.01
       },
       "2026-02": {
-        "rows": 2642,
-        "revenue": 62962878.85
+        "rows": 2803,
+        "revenue": 66620443.11
       },
       "2026-03": {
-        "rows": 2685,
-        "revenue": 69137521.76
+        "rows": 2705,
+        "revenue": 57143574.38
       },
       "2026-04": {
-        "rows": 2530,
-        "revenue": 67366326.47
+        "rows": 2816,
+        "revenue": 71935251.49
       },
       "2026-05": {
-        "rows": 2628,
-        "revenue": 65654074.68
+        "rows": 2720,
+        "revenue": 86703098.14
       },
       "2026-06": {
-        "rows": 2832,
-        "revenue": 84659658.69
+        "rows": 2705,
+        "revenue": 58721934.89
       }
     },
     "events": {
       "2026-01": {
-        "rows": 3335
+        "rows": 3367
       },
       "2026-02": {
-        "rows": 3362
+        "rows": 3313
       },
       "2026-03": {
-        "rows": 3434
+        "rows": 3369
       },
       "2026-04": {
-        "rows": 3374
+        "rows": 3331
       },
       "2026-05": {
-        "rows": 2661
+        "rows": 2649
       },
       "2026-06": {
-        "rows": 3351
+        "rows": 3313
       }
     }
   }

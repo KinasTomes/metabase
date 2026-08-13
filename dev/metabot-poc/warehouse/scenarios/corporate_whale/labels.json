@@ -46,6 +46,7 @@
       "id": "W3",
       "month": "2026-04",
       "metric": "transaction_count",
+      "dimension": "overall",
       "expect_detect": false,
       "why": "Volume is untouched. Revenue up with volume flat is the signature the narration must carry."
     }
@@ -53,48 +54,48 @@
   "injected_summary": {
     "transactions": {
       "2026-01": {
-        "rows": 2737,
-        "revenue": 72285179.07
+        "rows": 2649,
+        "revenue": 67480314.92
       },
       "2026-02": {
-        "rows": 2776,
-        "revenue": 79261033.51
+        "rows": 2561,
+        "revenue": 54104081.0
       },
       "2026-03": {
-        "rows": 2708,
-        "revenue": 72056787.79
+        "rows": 2480,
+        "revenue": 72738743.91
       },
       "2026-04": {
-        "rows": 2677,
-        "revenue": 116868376.17
+        "rows": 2753,
+        "revenue": 105322058.64
       },
       "2026-05": {
-        "rows": 2679,
-        "revenue": 80693164.55
+        "rows": 2468,
+        "revenue": 69667770.08
       },
       "2026-06": {
-        "rows": 2690,
-        "revenue": 75671629.8
+        "rows": 2645,
+        "revenue": 56466133.87
       }
     },
     "events": {
       "2026-01": {
-        "rows": 3296
+        "rows": 3365
       },
       "2026-02": {
-        "rows": 3326
+        "rows": 3317
       },
       "2026-03": {
-        "rows": 3307
+        "rows": 3313
       },
       "2026-04": {
-        "rows": 3301
+        "rows": 3282
       },
       "2026-05": {
-        "rows": 3410
+        "rows": 3326
       },
       "2026-06": {
-        "rows": 3307
+        "rows": 3290
       }
     }
   }

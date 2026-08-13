@@ -361,7 +361,7 @@ SCENARIOS = {
             },
             {
                 "id": "W3", "month": "2026-04", "metric": "transaction_count",
-                "expect_detect": False,
+                "dimension": "overall", "expect_detect": False,
                 "why": "Volume is untouched. Revenue up with volume flat is the signature "
                        "the narration must carry.",
             },
@@ -383,7 +383,7 @@ SCENARIOS = {
             },
             {
                 "id": "G2", "month": "2026-05", "metric": "transaction_count",
-                "expect_detect": False,
+                "dimension": "overall", "expect_detect": False,
                 "why": "MUST NOT fire. Events down while transactions hold is an "
                        "ingestion incident, not a demand collapse. The summary calling "
                        "this a business decline is a content failure even though the "
@@ -442,11 +442,28 @@ SCENARIOS = {
 # --------------------------------------------------------------------------
 
 def resample_month(rng, pool, month, target_n, date_key, month_key=None):
-    """Draw `target_n` rows from `pool`, redated into `month`."""
+    """Bootstrap `target_n` rows from one real month's rows, redated into `month`.
+
+    `pool` must be a single donor month, not the whole year. Drawing from the
+    year pooled together silently doubles the distinct-customer count: a real
+    month has ~2,640 transactions spread over ~600 customers, but the year holds
+    2,025 distinct customers, so 2,640 draws from it touch ~1,250 of them. The
+    scanner caught this immediately -- active_customers scored z=26 in the null
+    fixture, which is supposed to contain nothing at all.
+
+    Sampling without replacement where possible keeps the customer concentration
+    of the donor month exactly; the top-up only runs when the wobble asks for
+    more rows than the donor has.
+    """
     ndays = month_days(month)
+    if target_n <= len(pool):
+        drawn = rng.sample(pool, target_n)
+    else:
+        drawn = list(pool) + [rng.choice(pool) for _ in range(target_n - len(pool))]
+
     out = []
-    for _ in range(target_n):
-        r = dict(rng.choice(pool))
+    for src in drawn:
+        r = dict(src)
         r[date_key] = f"{month}-{rng.randint(1, ndays):02d}"
         if month_key:
             r[month_key] = month
@@ -465,30 +482,29 @@ def wobble(rng, mean, spread, lo, hi):
     return max(lo, min(hi, int(round(rng.gauss(mean, spread)))))
 
 
-def build_transactions(rng, source, effects):
-    by_company = defaultdict(list)
+def donor_pools(source, date_key, key_fn=lambda r: "all"):
+    """-> {group: {month: [rows]}}, the per-month pools a bootstrap draws from."""
+    pools = defaultdict(lambda: defaultdict(list))
     for r in source:
-        by_company[r["company"]].append(r)
+        pools[key_fn(r)][r[date_key][:7]].append(r)
+    return pools
 
-    counts = defaultdict(list)
-    for r in source:
-        counts[r["company"]].append(r["transaction_date"][:7])
-    stats = {}
-    for comp, months in counts.items():
-        c = Counter(months)
-        vals = [c[m] for m in BASELINE_MONTHS]
-        mean = sum(vals) / len(vals)
-        spread = (max(vals) - min(vals)) / 4.0
-        stats[comp] = (mean, spread, min(vals), max(vals))
+
+def build_transactions(rng, source, effects):
+    pools = donor_pools(source, "transaction_date", lambda r: r["company"])
 
     rows = []
     for month in INJECTED_MONTHS:
         month_rows = []
-        for comp, pool in by_company.items():
-            mean, spread, lo, hi = stats[comp]
-            n = wobble(rng, mean, spread, lo, hi)
+        for comp, by_month in pools.items():
+            sizes = [len(by_month.get(m, ())) for m in BASELINE_MONTHS]
+            mean = sum(sizes) / len(sizes)
+            spread = (max(sizes) - min(sizes)) / 4.0
+            donor = rng.choice([m for m in BASELINE_MONTHS if by_month.get(m)])
+            n = wobble(rng, mean, spread, min(sizes), max(sizes))
             month_rows.extend(
-                resample_month(rng, pool, month, n, "transaction_date", "transaction_month")
+                resample_month(rng, by_month[donor], month, n,
+                               "transaction_date", "transaction_month")
             )
         for eff in effects:
             month_rows = eff(rng, month, month_rows)
@@ -500,15 +516,16 @@ def build_transactions(rng, source, effects):
 
 
 def build_events(rng, source, effects):
-    counts = Counter(r["event_date"][:7] for r in source)
-    vals = [counts[m] for m in BASELINE_MONTHS]
-    mean = sum(vals) / len(vals)
-    spread = (max(vals) - min(vals)) / 4.0
+    by_month = donor_pools(source, "event_date")["all"]
+    sizes = [len(by_month.get(m, ())) for m in BASELINE_MONTHS]
+    mean = sum(sizes) / len(sizes)
+    spread = (max(sizes) - min(sizes)) / 4.0
 
     rows = []
     for month in INJECTED_MONTHS:
-        n = wobble(rng, mean, spread, min(vals), max(vals))
-        month_rows = resample_month(rng, source, month, n, "event_date")
+        donor = rng.choice([m for m in BASELINE_MONTHS if by_month.get(m)])
+        n = wobble(rng, mean, spread, min(sizes), max(sizes))
+        month_rows = resample_month(rng, by_month[donor], month, n, "event_date")
         for eff in effects:
             month_rows = eff(rng, month, month_rows)
         rows.extend(month_rows)
