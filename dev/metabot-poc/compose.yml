@@ -97,7 +97,9 @@ services:
   nightly:
     profiles: ["nightly"]
     image: python:3.12-slim
-    working_dir: /poc/nightly
+    # Keep the same dev/metabot-poc nesting as the checkout. Imported helpers
+    # resolve paths relative to that layout even though only the POC is mounted.
+    working_dir: /workspace/dev/metabot-poc/nightly
     command: >
       sh -c "pip install --quiet --no-cache-dir psycopg2-binary &&
              python run_nightly.py --loop --at ${NIGHTLY_AT:-02:00}"
@@ -115,7 +117,7 @@ services:
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
       PYTHONUNBUFFERED: "1"
     volumes:
-      - .:/poc
+      - .:/workspace/dev/metabot-poc
     depends_on:
       warehouse:
         condition: service_healthy
