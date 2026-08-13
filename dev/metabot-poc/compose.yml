@@ -86,6 +86,41 @@ services:
     ports:
       - "${METABOT_HOST_PORT:-3000}:3000"
 
+  # Sprint 3: the proactive reporter. Sleeps until 02:00 UTC, scans, and
+  # publishes. Started only with `--profile nightly`, so the default `up -d`
+  # still brings up just the chat stack.
+  #
+  # It reaches the warehouse over the Compose network, so host, port and site
+  # URL all differ from the values the same scripts use from a laptop -- that
+  # difference is the whole reason these are overridden here rather than read
+  # from .env.
+  nightly:
+    profiles: ["nightly"]
+    image: python:3.12-slim
+    working_dir: /poc/nightly
+    command: >
+      sh -c "pip install --quiet --no-cache-dir psycopg2-binary &&
+             python run_nightly.py --loop --at ${NIGHTLY_AT:-02:00}"
+    environment:
+      WAREHOUSE_HOST: warehouse
+      WAREHOUSE_PORT: 5432
+      WAREHOUSE_DB: ${WAREHOUSE_DB:-bi_warehouse}
+      WAREHOUSE_USER: ${WAREHOUSE_USER:-postgres}
+      WAREHOUSE_PASSWORD: ${WAREHOUSE_PASSWORD:?Set WAREHOUSE_PASSWORD in dev/metabot-poc/.env}
+      METABOT_SITE_URL: http://metabase:3000
+      METABOT_ADMIN_EMAIL: ${METABOT_ADMIN_EMAIL:-admin@metabot.local}
+      METABOT_ADMIN_PASSWORD: ${METABOT_ADMIN_PASSWORD:?Set METABOT_ADMIN_PASSWORD in dev/metabot-poc/.env}
+      MB_LLM_OPENROUTER_API_KEY: ${MB_LLM_OPENROUTER_API_KEY:-}
+      MB_LLM_OPENROUTER_API_BASE_URL: ${MB_LLM_OPENROUTER_API_BASE_URL:-https://openrouter.ai/api}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - .:/poc
+    depends_on:
+      warehouse:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   metabot_app_db:
   metabot_warehouse:
