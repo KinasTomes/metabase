@@ -139,10 +139,23 @@ giao dịch. Không có baseline thì z-score chia cho 0 hoặc bỏ qua. Hạng
 một loại finding riêng, không phải một con số lệch.
 
 **Trung bình winsorize cho cột feature.** 8 cột `PROFILED` là số nguyên đuôi nặng,
-**trung vị bằng 2** — trung vị không thể nhúc nhích dù giá trị tăng gấp đôi. Trung bình
-thô thì dải 12 tháng thật là 4,36–12,56, gần gấp ba, cũng vô dụng. Trung bình winsorize
-p95 cho dải 3,45–5,41 (±44%), đủ ổn định để so. Cùng lý do đuôi nặng như doanh thu, nên
-cùng cách xử lý.
+trung vị chỉ bằng 2. Trung bình thô thì dải 12 tháng thật là 4,36–12,56, gần gấp ba —
+vô dụng. Trung bình winsorize p95 cho dải 3,45–5,41 (±44%), đủ ổn định để so. Cùng lý do
+đuôi nặng như doanh thu, nên cùng cách xử lý.
+
+> **Cạm bẫy `least()` — sẽ giẫm phải nếu winsorize bằng SQL.** Trong Postgres,
+> `least(NULL, 20)` trả về **20**, không phải NULL: hàm này bỏ qua NULL thay vì lan
+> truyền nó. Cột feature chỉ có 119/400 dòng non-null (khách VinFast không có feature
+> GSM), nên `avg(least(feature_value, 20))` biến 281 NULL thành 281 giá trị 20 và đẩy
+> trung bình từ 5,28 lên **15,25** — cao hơn cả trung bình thô, dù đang cắt ngọn.
+>
+> Tôi đã dính đúng lỗi này khi kiểm tra dữ liệu sau khi nạp, và suýt kết luận là hiệu
+> ứng tiêm vào bị mất. `scan.py` phải winsorize kèm chặn NULL tường minh
+> (`case when v is null then null else least(v, cap) end`), và bài test cho nó là một
+> cột có NULL.
+
+Xác nhận lại bằng thống kê đúng: hiệu ứng ×1,9 có trong DB — **trung vị dịch từ 2 lên 4**
+ở ba tháng tiêm, và wmean p95 đạt 8,96 so với dải nền 3,45–5,41.
 
 ### 2.4 "Hằng đêm" trên dữ liệu tĩnh
 
