@@ -1,0 +1,97 @@
+{
+  "scenario": "food_churn",
+  "description": "A competitor takes food-delivery share. -4% a month, compounding, for six months.",
+  "seed": 20260813,
+  "baseline_months": [
+    "2025-01",
+    "2025-02",
+    "2025-03",
+    "2025-04",
+    "2025-05",
+    "2025-06",
+    "2025-07",
+    "2025-08",
+    "2025-09",
+    "2025-10",
+    "2025-11",
+    "2025-12"
+  ],
+  "injected_months": [
+    "2026-01",
+    "2026-02",
+    "2026-03",
+    "2026-04",
+    "2026-05",
+    "2026-06"
+  ],
+  "baseline_is_real": true,
+  "schema": "scenario_food_churn",
+  "expectations": [
+    {
+      "id": "F1",
+      "month": "2026-06",
+      "metric": "transaction_count",
+      "dimension": "product=food",
+      "direction": "down",
+      "expect_detect": false,
+      "why": "MUST NOT fire on the month-over-month detector. Each step is ~4%, far inside the monthly noise band. This is the most realistic business risk in the whole set and the step detector cannot see it -- the gap is the finding."
+    },
+    {
+      "id": "F2",
+      "month": "2026-06",
+      "metric": "transaction_count_trend",
+      "dimension": "product=food",
+      "direction": "down",
+      "expect_detect": true,
+      "why": "A trend test over the trailing six months (Mann-Kendall or a slope on the monthly series) should catch a 22% cumulative fall. This label is what justifies building one."
+    }
+  ],
+  "injected_summary": {
+    "transactions": {
+      "2026-01": {
+        "rows": 2609,
+        "revenue": 68237818.2
+      },
+      "2026-02": {
+        "rows": 2651,
+        "revenue": 65243727.82
+      },
+      "2026-03": {
+        "rows": 2558,
+        "revenue": 77191231.6
+      },
+      "2026-04": {
+        "rows": 2720,
+        "revenue": 86720687.52
+      },
+      "2026-05": {
+        "rows": 2452,
+        "revenue": 73657868.32
+      },
+      "2026-06": {
+        "rows": 2568,
+        "revenue": 78437062.47
+      }
+    },
+    "events": {
+      "2026-01": {
+        "rows": 3281
+      },
+      "2026-02": {
+        "rows": 3374
+      },
+      "2026-03": {
+        "rows": 3290
+      },
+      "2026-04": {
+        "rows": 3336
+      },
+      "2026-05": {
+        "rows": 3317
+      },
+      "2026-06": {
+        "rows": 3290
+      }
+    }
+  }
+}

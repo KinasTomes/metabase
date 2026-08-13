@@ -1,0 +1,88 @@
+{
+  "scenario": "vinfast_push",
+  "description": "VinFast runs a vehicle campaign. Volume up 80% -- on 31 rows a month.",
+  "seed": 20260813,
+  "baseline_months": [
+    "2025-01",
+    "2025-02",
+    "2025-03",
+    "2025-04",
+    "2025-05",
+    "2025-06",
+    "2025-07",
+    "2025-08",
+    "2025-09",
+    "2025-10",
+    "2025-11",
+    "2025-12"
+  ],
+  "injected_months": [
+    "2026-01",
+    "2026-02",
+    "2026-03",
+    "2026-04",
+    "2026-05",
+    "2026-06"
+  ],
+  "baseline_is_real": true,
+  "schema": "scenario_vinfast_push",
+  "expectations": [
+    {
+      "id": "V1",
+      "month": "2026-06",
+      "metric": "transaction_count",
+      "dimension": "company=VinFast",
+      "direction": "up",
+      "expect_detect": false,
+      "why": "MUST NOT fire. The effect is real and large in percentage terms, but VinFast averages 31 transactions a month, so the sample-size gate should reject it. Suppressing a true effect is the correct call here and the limitation belongs in the runbook, not in a bug list."
+    }
+  ],
+  "injected_summary": {
+    "transactions": {
+      "2026-01": {
+        "rows": 2563,
+        "revenue": 72348494.12
+      },
+      "2026-02": {
+        "rows": 2684,
+        "revenue": 66342965.39
+      },
+      "2026-03": {
+        "rows": 2820,
+        "revenue": 74370293.98
+      },
+      "2026-04": {
+        "rows": 2589,
+        "revenue": 77850027.21
+      },
+      "2026-05": {
+        "rows": 2559,
+        "revenue": 72742554.76
+      },
+      "2026-06": {
+        "rows": 2743,
+        "revenue": 66375525.22
+      }
+    },
+    "events": {
+      "2026-01": {
+        "rows": 3346
+      },
+      "2026-02": {
+        "rows": 3329
+      },
+      "2026-03": {
+        "rows": 3253
+      },
+      "2026-04": {
+        "rows": 3253
+      },
+      "2026-05": {
+        "rows": 3282
+      },
+      "2026-06": {
+        "rows": 3364
+      }
+    }
+  }
+}

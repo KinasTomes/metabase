@@ -1,0 +1,94 @@
+{
+  "scenario": "pipeline_gap",
+  "description": "Event ingestion drops 70% for nine days in May. Transactions unaffected.",
+  "seed": 20260813,
+  "baseline_months": [
+    "2025-01",
+    "2025-02",
+    "2025-03",
+    "2025-04",
+    "2025-05",
+    "2025-06",
+    "2025-07",
+    "2025-08",
+    "2025-09",
+    "2025-10",
+    "2025-11",
+    "2025-12"
+  ],
+  "injected_months": [
+    "2026-01",
+    "2026-02",
+    "2026-03",
+    "2026-04",
+    "2026-05",
+    "2026-06"
+  ],
+  "baseline_is_real": true,
+  "schema": "scenario_pipeline_gap",
+  "expectations": [
+    {
+      "id": "G1",
+      "month": "2026-05",
+      "metric": "event_count",
+      "direction": "down",
+      "expect_detect": true,
+      "why": "Roughly -20% on the month."
+    },
+    {
+      "id": "G2",
+      "month": "2026-05",
+      "metric": "transaction_count",
+      "expect_detect": false,
+      "why": "MUST NOT fire. Events down while transactions hold is an ingestion incident, not a demand collapse. The summary calling this a business decline is a content failure even though the detection was right."
+    }
+  ],
+  "injected_summary": {
+    "transactions": {
+      "2026-01": {
+        "rows": 2678,
+        "revenue": 74243908.62
+      },
+      "2026-02": {
+        "rows": 2642,
+        "revenue": 62962878.85
+      },
+      "2026-03": {
+        "rows": 2685,
+        "revenue": 69137521.76
+      },
+      "2026-04": {
+        "rows": 2530,
+        "revenue": 67366326.47
+      },
+      "2026-05": {
+        "rows": 2628,
+        "revenue": 65654074.68
+      },
+      "2026-06": {
+        "rows": 2832,
+        "revenue": 84659658.69
+      }
+    },
+    "events": {
+      "2026-01": {
+        "rows": 3335
+      },
+      "2026-02": {
+        "rows": 3362
+      },
+      "2026-03": {
+        "rows": 3434
+      },
+      "2026-04": {
+        "rows": 3374
+      },
+      "2026-05": {
+        "rows": 2661
+      },
+      "2026-06": {
+        "rows": 3351
+      }
+    }
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "scenario": "province_expansion",
+  "description": "Launch in Khanh Hoa. Share ramps 0 -> 5% -> 9% -> 12% over three months.",
+  "seed": 20260813,
+  "baseline_months": [
+    "2025-01",
+    "2025-02",
+    "2025-03",
+    "2025-04",
+    "2025-05",
+    "2025-06",
+    "2025-07",
+    "2025-08",
+    "2025-09",
+    "2025-10",
+    "2025-11",
+    "2025-12"
+  ],
+  "injected_months": [
+    "2026-01",
+    "2026-02",
+    "2026-03",
+    "2026-04",
+    "2026-05",
+    "2026-06"
+  ],
+  "baseline_is_real": true,
+  "schema": "scenario_province_expansion",
+  "expectations": [
+    {
+      "id": "P1",
+      "month": "2026-03",
+      "metric": "province_mix",
+      "dimension": "province=Khánh Hòa",
+      "direction": "new",
+      "expect_detect": true,
+      "why": "A category that did not exist before. Detecting it needs a new-category rule, not a z-score -- there is no baseline to compare against, so a purely numeric detector will divide by zero or skip it."
+    }
+  ],
+  "injected_summary": {
+    "transactions": {
+      "2026-01": {
+        "rows": 2656,
+        "revenue": 68371736.61
+      },
+      "2026-02": {
+        "rows": 2603,
+        "revenue": 67806026.65
+      },
+      "2026-03": {
+        "rows": 2463,
+        "revenue": 70995988.29
+      },
+      "2026-04": {
+        "rows": 2619,
+        "revenue": 67715802.37
+      },
+      "2026-05": {
+        "rows": 2601,
+        "revenue": 76949485.57
+      },
+      "2026-06": {
+        "rows": 2833,
+        "revenue": 69961498.33
+      }
+    },
+    "events": {
+      "2026-01": {
+        "rows": 3331
+      },
+      "2026-02": {
+        "rows": 3395
+      },
+      "2026-03": {
+        "rows": 3363
+      },
+      "2026-04": {
+        "rows": 3291
+      },
+      "2026-05": {
+        "rows": 3277
+      },
+      "2026-06": {
+        "rows": 3253
+      }
+    }
+  }
+}

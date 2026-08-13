@@ -1,0 +1,101 @@
+{
+  "scenario": "corporate_whale",
+  "description": "A corporate account books four very large express jobs in April.",
+  "seed": 20260813,
+  "baseline_months": [
+    "2025-01",
+    "2025-02",
+    "2025-03",
+    "2025-04",
+    "2025-05",
+    "2025-06",
+    "2025-07",
+    "2025-08",
+    "2025-09",
+    "2025-10",
+    "2025-11",
+    "2025-12"
+  ],
+  "injected_months": [
+    "2026-01",
+    "2026-02",
+    "2026-03",
+    "2026-04",
+    "2026-05",
+    "2026-06"
+  ],
+  "baseline_is_real": true,
+  "schema": "scenario_corporate_whale",
+  "expectations": [
+    {
+      "id": "W1",
+      "month": "2026-04",
+      "metric": "revenue_total",
+      "direction": "up",
+      "expect_detect": true,
+      "why": "Four rows move the monthly total by more than half."
+    },
+    {
+      "id": "W2",
+      "month": "2026-04",
+      "metric": "revenue_winsorised_p99",
+      "expect_detect": false,
+      "why": "MUST NOT fire once the tail is clipped. The pair W1/W2 is the whole test: a finding that survives W1 and dies at W2 has to be reported as 'four large jobs', not as revenue growth."
+    },
+    {
+      "id": "W3",
+      "month": "2026-04",
+      "metric": "transaction_count",
+      "expect_detect": false,
+      "why": "Volume is untouched. Revenue up with volume flat is the signature the narration must carry."
+    }
+  ],
+  "injected_summary": {
+    "transactions": {
+      "2026-01": {
+        "rows": 2737,
+        "revenue": 72285179.07
+      },
+      "2026-02": {
+        "rows": 2776,
+        "revenue": 79261033.51
+      },
+      "2026-03": {
+        "rows": 2708,
+        "revenue": 72056787.79
+      },
+      "2026-04": {
+        "rows": 2677,
+        "revenue": 116868376.17
+      },
+      "2026-05": {
+        "rows": 2679,
+        "revenue": 80693164.55
+      },
+      "2026-06": {
+        "rows": 2690,
+        "revenue": 75671629.8
+      }
+    },
+    "events": {
+      "2026-01": {
+        "rows": 3296
+      },
+      "2026-02": {
+        "rows": 3326
+      },
+      "2026-03": {
+        "rows": 3307
+      },
+      "2026-04": {
+        "rows": 3301
+      },
+      "2026-05": {
+        "rows": 3410
+      },
+      "2026-06": {
+        "rows": 3307
+      }
+    }
+  }
+}

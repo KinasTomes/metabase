@@ -1,0 +1,96 @@
+{
+  "scenario": "tet_surge",
+  "description": "Tet 2026 (17 Feb). Rides pull forward into the fortnight before, the holiday week empties out.",
+  "seed": 20260813,
+  "baseline_months": [
+    "2025-01",
+    "2025-02",
+    "2025-03",
+    "2025-04",
+    "2025-05",
+    "2025-06",
+    "2025-07",
+    "2025-08",
+    "2025-09",
+    "2025-10",
+    "2025-11",
+    "2025-12"
+  ],
+  "injected_months": [
+    "2026-01",
+    "2026-02",
+    "2026-03",
+    "2026-04",
+    "2026-05",
+    "2026-06"
+  ],
+  "baseline_is_real": true,
+  "schema": "scenario_tet_surge",
+  "expectations": [
+    {
+      "id": "T1",
+      "month": "2026-02",
+      "metric": "transaction_count",
+      "dimension": "product=taxi",
+      "direction": "up",
+      "expect_detect": true,
+      "why": "A real seasonal peak, the largest in the Vietnamese calendar."
+    },
+    {
+      "id": "T2",
+      "month": "2026-02",
+      "metric": "transaction_count",
+      "dimension": "overall",
+      "expect_detect": null,
+      "why": "Borderline on purpose. The intra-month shape moves far more than the monthly total, so a monthly aggregate may miss it. Whichever way it lands, it is evidence about the aggregation window, not a pass or a fail."
+    }
+  ],
+  "injected_summary": {
+    "transactions": {
+      "2026-01": {
+        "rows": 2453,
+        "revenue": 69045383.96
+      },
+      "2026-02": {
+        "rows": 3115,
+        "revenue": 88085239.73
+      },
+      "2026-03": {
+        "rows": 2616,
+        "revenue": 62938161.82
+      },
+      "2026-04": {
+        "rows": 2603,
+        "revenue": 63688767.77
+      },
+      "2026-05": {
+        "rows": 2827,
+        "revenue": 76150506.35
+      },
+      "2026-06": {
+        "rows": 2660,
+        "revenue": 78176347.16
+      }
+    },
+    "events": {
+      "2026-01": {
+        "rows": 3379
+      },
+      "2026-02": {
+        "rows": 3313
+      },
+      "2026-03": {
+        "rows": 3365
+      },
+      "2026-04": {
+        "rows": 3434
+      },
+      "2026-05": {
+        "rows": 3330
+      },
+      "2026-06": {
+        "rows": 3354
+      }
+    }
+  }
+}

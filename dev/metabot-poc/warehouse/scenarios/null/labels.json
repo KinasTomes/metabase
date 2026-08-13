@@ -1,0 +1,86 @@
+{
+  "scenario": "null",
+  "description": "Six more months drawn from the same distribution. Nothing happens.",
+  "seed": 20260813,
+  "baseline_months": [
+    "2025-01",
+    "2025-02",
+    "2025-03",
+    "2025-04",
+    "2025-05",
+    "2025-06",
+    "2025-07",
+    "2025-08",
+    "2025-09",
+    "2025-10",
+    "2025-11",
+    "2025-12"
+  ],
+  "injected_months": [
+    "2026-01",
+    "2026-02",
+    "2026-03",
+    "2026-04",
+    "2026-05",
+    "2026-06"
+  ],
+  "baseline_is_real": true,
+  "schema": "scenario_null",
+  "expectations": [
+    {
+      "id": "N1",
+      "month": null,
+      "metric": "any",
+      "expect_detect": false,
+      "why": "No effect applied anywhere. Any finding here is a false positive, and the count across all six months is the scanner's false-positive rate."
+    }
+  ],
+  "injected_summary": {
+    "transactions": {
+      "2026-01": {
+        "rows": 2576,
+        "revenue": 74886062.41
+      },
+      "2026-02": {
+        "rows": 2385,
+        "revenue": 54491465.18
+      },
+      "2026-03": {
+        "rows": 2620,
+        "revenue": 71733807.97
+      },
+      "2026-04": {
+        "rows": 2508,
+        "revenue": 63999896.54
+      },
+      "2026-05": {
+        "rows": 2601,
+        "revenue": 62815399.99
+      },
+      "2026-06": {
+        "rows": 2658,
+        "revenue": 81326274.25
+      }
+    },
+    "events": {
+      "2026-01": {
+        "rows": 3395
+      },
+      "2026-02": {
+        "rows": 3305
+      },
+      "2026-03": {
+        "rows": 3401
+      },
+      "2026-04": {
+        "rows": 3376
+      },
+      "2026-05": {
+        "rows": 3429
+      },
+      "2026-06": {
+        "rows": 3421
+      }
+    }
+  }
+}

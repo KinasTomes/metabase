@@ -2,3 +2,8 @@
 .env.bak
 .env.*
 !.env.example
+
+# Generated scenario fixtures: ~530 MB of resampled CSV, reproducible from
+# gen_scenario_data.py with a fixed seed. The labels are the contract and are
+# committed; the rows are not.
+warehouse/scenarios/*/*.csv
