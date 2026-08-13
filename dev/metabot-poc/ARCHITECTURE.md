@@ -51,12 +51,9 @@ kiến trúc tốt hơn: mọi tri thức nghiệp vụ nằm trong **metadata c
 ```mermaid
 flowchart LR
     A["COMMENT ON COLUMN"] --> B["pg_description"]
-    B -->|sync| C["field.description<br/>trong Metabase"]
+    B -->|"sync (một lần)"| C["field.description<br/>trong Metabase"]
     B -.->|"push_descriptions()<br/>PUT qua API"| C
-    C --> D["tool get-tables"] --> E["context của LLM"]
-    F["format-table-ddl"] -->|"chỉ tên cột + kiểu,<br/>KHÔNG mang mô tả"| E
-
-    style F fill:#fff3cd,stroke:#ffc107
+    C --> D["tool read_resource<br/><i>metabase://table/{id}/fields</i>"] --> E["context của LLM"]
 ```
 
 Nếu comment không tới được Metabase, model vẫn chạy bình thường — chỉ là mù. Hỏng im
@@ -88,7 +85,95 @@ nguyên con số cũ sau khi thêm cảnh báo.
 > Metadata đặt sự thật vào tầm với của model. Model có đọc và thuật lại hay không là
 > thuộc tính của model.
 
-## 4. Tầng ngữ nghĩa: schema `analytics`
+## 4. Một lượt hỏi đáp chạy qua đâu
+
+Metabase bản này chạy **agent loop viết bằng Clojure** (`metabase.metabot.agent.core`),
+không gọi ra AI service Python. Chat trong trình duyệt dùng profile `internal`
+(`metabase.metabot.config/metabot-config`), giới hạn **10 iteration**.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as 👤 Người dùng
+    participant API as /api/metabot-v3/v2/agent
+    participant L as agent loop
+    participant LLM as LLM gateway
+    participant T as tools
+    participant PG as warehouse
+
+    U->>API: "Doanh thu GSM theo tháng"
+    API->>L: profile internal, history, context
+
+    rect rgb(245,245,245)
+    note over L,T: iteration 1 — tìm bảng
+    L->>LLM: system prompt + history + schema của tools
+    LLM-->>L: tool_call search("doanh thu GSM")
+    L->>T: search
+    T-->>L: metabase://table/42 fact_transactions
+    end
+
+    rect rgb(245,245,245)
+    note over L,T: iteration 2 — đọc metadata
+    L->>LLM: + kết quả search
+    LLM-->>L: tool_call read_resource(table/42/fields)
+    T-->>L: cột + <b>description</b> (từ COMMENT ON)
+    end
+
+    rect rgb(245,245,245)
+    note over L,PG: iteration 3 — dựng và chạy truy vấn
+    L->>LLM: + metadata bảng
+    LLM-->>L: tool_call construct_notebook_query(MBQL)
+    T->>PG: MBQL biên dịch thành SQL
+    PG-->>T: kết quả
+    T-->>L: query-id, chart-id, chart-content
+    end
+
+    L->>LLM: + kết quả truy vấn
+    LLM-->>L: text (không còn tool call) → dừng
+    L-->>U: SSE — biểu đồ + lời giải thích
+```
+
+Điều kiện dừng, kiểm tra sau mỗi iteration (`should-continue?`):
+
+```mermaid
+flowchart LR
+    P["parts trả về<br/>từ LLM"] --> E{rỗng?}
+    E -->|có| S1[":empty-response"]
+    E -->|không| TC{"còn tool call?"}
+    TC -->|không| S2[":stop — đây là câu trả lời"]
+    TC -->|có| TT{"terminal tool<br/>gọi thành công?"}
+    TT -->|có| S3[":terminal-tool"]
+    TT -->|không| IT{"iteration < 10?"}
+    IT -->|có| L["iteration tiếp theo"]
+    IT -->|không| S4[":max-iterations"]
+
+    style S2 fill:#d4edda,stroke:#28a745
+    style S4 fill:#f8d7da,stroke:#dc3545
+```
+
+`:max-iterations` là **thất bại**, không phải kết thúc bình thường: model tiêu hết 10
+lượt mà chưa ra câu trả lời. Đã gặp thật — Q11 gọi `construct_notebook_query` bốn lần
+liên tiếp rồi bỏ cuộc, không sinh query nào.
+
+Profile `internal` phơi ra 12 tool; bốn cái quan trọng với POC này:
+
+| Tool | Vai trò | Ghi chú |
+| --- | --- | --- |
+| `search` | tìm bảng theo chủ đề | keyword + semantic |
+| `read_resource` | đọc chi tiết qua URI | **kênh duy nhất mang description tới model** |
+| `construct_notebook_query` | nhận MBQL 5, chạy, dựng chart | thứ harness bám vào để chấm |
+| `analyze_chart` | đọc lại kết quả để bình luận | |
+
+Không tool nào nhận SQL thô ở profile này. `create_sql_query` có trong danh sách nhưng
+thuộc luồng SQL editor, không phải luồng hỏi đáp.
+
+**Chỗ harness cắm vào.** `run_acceptance.py` đọc stream SSE, lấy pMBQL từ
+`data-state.queries` — tức **đúng cây truy vấn `construct_notebook_query` đã dựng** — rồi
+tự chạy lại qua `/api/dataset` và so với ground truth. Nên khi harness báo `NO_QUERY`
+nghĩa là loop kết thúc mà không iteration nào gọi `construct_notebook_query` thành công:
+model đã trả lời bằng văn xuôi, không có gì chấm được.
+
+## 5. Tầng ngữ nghĩa: schema `analytics`
 
 ```mermaid
 erDiagram
@@ -126,7 +211,7 @@ erDiagram
 Cộng thêm `dim_feature_catalogue` (34 dòng) — **định nghĩa, không phải dữ liệu**, không
 join với gì cả.
 
-### 4.1 Vì sao có hai dimension khách hàng
+### 5.1 Vì sao có hai dimension khách hàng
 
 Metabase chỉ khai được **FK một cột**. Mọi khoá tự nhiên còn lại đều ghép. Trỏ FK vào
 `dim_customer.customer_id` sẽ join một dòng ra nhiều dòng và **nhân đôi doanh thu** —
@@ -137,7 +222,7 @@ Nó **cố tình không mang nhân khẩu học**: trong 2.600 người, 1.400 k
 khác tỉnh, 929 khác giới tính giữa hai hồ sơ PnL. Chọn một bên là bịa dữ liệu, mà giá
 trị dimension bịa thì model không có cách nào biết là sai. Chỉ `is_vip` nhất quán.
 
-### 4.2 Vì sao feature store bị pivot
+### 5.2 Vì sao feature store bị pivot
 
 Bảng serving là **EAV** — 163.200 dòng `feature_name`/`feature_value`. Model sẽ phải
 đoán đúng từng ký tự chuỗi `gsm_transaction_completed_txn_count_l3m`. Pivot thành 20
@@ -153,7 +238,7 @@ join**.
 Chỉ snapshot mới nhất được phơi ra: bảng serving là content-addressed, snapshot mới
 *append* chứ không ghi đè, nên pivot không lọc sẽ âm thầm trộn hai snapshot.
 
-### 4.3 Ranh giới catalogue / executable fact
+### 5.3 Ranh giới catalogue / executable fact
 
 Quyết định kiến trúc quan trọng nhất trong tầng ngữ nghĩa. Registry là danh mục những
 gì đã được **định nghĩa**; nó không phải bằng chứng rằng một chỉ số **trả lời được**.
@@ -189,7 +274,7 @@ tồn tại để mà truy vấn.
 > chỉ *mô tả* mâu thuẫn trong comment — mô tả cái bẫy không phải là đóng nó lại, cột
 > vẫn truy vấn được và MetaBot vẫn trả 7.712.
 
-### 4.4 Nguồn gốc dữ liệu, và vì sao chỉ có 34 feature
+### 5.4 Nguồn gốc dữ liệu, và vì sao chỉ có 34 feature
 
 Quan trọng khi đọc mọi con số trong POC. Đầu vào của cả dự án chỉ có **hai file**:
 `features_list_20260719.xlsx` và `global_txn_v3_20251101.xlsx` (sheet `nullrate`). Toàn
@@ -237,7 +322,7 @@ store hiện hoàn toàn thiếu. Không thêm được: mỗi dòng registry ma
 hash cho một cuộc review chưa từng diễn ra**. Bảng từ chối, và nó đúng khi từ chối.
 Đường mở rộng hợp lệ là một đợt review mới sinh ra registry `1.1.0`.
 
-## 5. Bảo mật và cô lập
+## 6. Bảo mật và cô lập
 
 Phòng thủ theo lớp, mỗi lớp độc lập:
 
@@ -259,7 +344,7 @@ docker run --rm --network metabot-poc_default -e PGPASSWORD=... postgres:16-alpi
 > postgres có `host all all 127.0.0.1/32 trust` **đứng trước** dòng scram, nên nó báo
 > thành công kể cả khi mật khẩu sai. Phải test từ đúng đường mạng Metabase dùng.
 
-## 6. Đo lường
+## 7. Đo lường
 
 Cả hai bộ đều **chấm bằng cách thực thi truy vấn MetaBot dựng ra**, không chấm văn bản —
 văn bản muốn diễn đạt kiểu gì cũng được, còn truy vấn thì hoặc đúng cột đúng filter hoặc
@@ -275,7 +360,7 @@ Câu 1–13 đo truy vấn một bảng; câu 14–16 bắt buộc join — vì 
 gì** về khả năng join, đúng thứ Sprint 2 đòi. Bộ hard chấm bằng regex nên **thô**; báo
 cáo luôn in nguyên văn để đọc lại.
 
-## 7. Vòng lặp phát triển
+## 8. Vòng lặp phát triển
 
 Build lại image mất 17–40 phút, nên có `patch_prompts.py`: chép jar gốc ra `.cache/`,
 thay resource, đẩy ngược vào container, restart — **~80 giây**.
@@ -284,7 +369,7 @@ Giới hạn: nó chỉ thay được **file resource**, không thay được h�
 dụ đã gặp: `security.clj` khai `inline-js-hashes` là `^:const`, AOT nội tuyến digest
 thẳng vào bytecode, nên vá file JS không đổi được header CSP — bắt buộc rebuild.
 
-## 8. Những cái đã cắn, ghi lại để khỏi cắn lại
+## 9. Những cái đã cắn, ghi lại để khỏi cắn lại
 
 **CRLF, hai lần.** Lần một: shebang `run_metabase.sh` thành `#!/bin/bash\r`, container
 chết với `no such file or directory`. Lần hai tinh vi hơn: `security.clj` hash **bytes
@@ -316,7 +401,7 @@ không có tác dụng lên volume đã tồn tại, và triệu chứng là m�
 adapter **`openrouter`** (nói `/chat/completions`): 3/3. Tên provider ở đây chỉ là định
 dạng giao thức, không liên quan openrouter.ai.
 
-## 9. Còn thiếu
+## 10. Còn thiếu
 
 - Q10/Q12 vẫn sai trên `gpt-5.6-luna`; bản vá ở tầng mô tả đã chứng minh là không đủ.
 - Chấm bằng regex là thô. Đo nghiêm túc cần LLM-judge hoặc rubric chấm tay.

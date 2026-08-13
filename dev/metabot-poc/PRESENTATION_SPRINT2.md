@@ -48,6 +48,28 @@ flowchart LR
     MB -->|"chỉ SELECT<br/>trên analytics"| WH[("warehouse")]
 ```
 
+Một câu hỏi đi qua **agent loop**, tối đa 10 vòng, mỗi vòng model chọn gọi tool hay trả
+lời. Loop dừng khi model thôi gọi tool:
+
+```mermaid
+sequenceDiagram
+    participant U as 👤
+    participant L as agent loop
+    participant LLM
+    participant PG as warehouse
+    U->>L: "Doanh thu GSM theo tháng"
+    L->>LLM: câu hỏi + danh sách tool
+    LLM-->>L: search("doanh thu GSM")
+    LLM-->>L: read_resource(table/fields) → <b>mô tả cột</b>
+    LLM-->>L: construct_notebook_query(MBQL)
+    L->>PG: MBQL → SQL
+    PG-->>L: kết quả
+    LLM-->>U: biểu đồ + giải thích
+```
+
+Nói kèm một câu: bộ đo bám vào đúng cây MBQL ở bước áp chót, nên nó chấm **truy vấn**,
+không chấm lời văn.
+
 **a) Sinh MBQL, không sinh SQL thô.** Truy vấn có cấu trúc rồi mới biên dịch xuống SQL:
 không injection, sai thì fail lúc dựng, và phân quyền ép ở tầng Postgres — MetaBot có cố
 trỏ vào `silver` cũng bị từ chối.
