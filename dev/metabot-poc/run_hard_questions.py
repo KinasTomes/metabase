@@ -83,6 +83,18 @@ SIGNALS = {
                           r"(có event|có sự kiện).{0,120}(có giao dịch|có phát sinh giao dịch)|"
                           r"trong (khoảng|vòng) .{0,20}(thời gian|bao lâu|nào)|"
                           r"depends on .{0,30}(how|what) .{0,20}(you )?(define|mean)",
+    # H10. Both sources answer, and disagree. A passing answer has to show it
+    # noticed there were two -- either by naming both, by flagging the 200
+    # customer cohort as unrepresentative, or by saying the numbers do not
+    # reconcile. One number with no mention of the other is the failure.
+    "source_mismatch": r"(hai|2|both) nguồn|two sources|"
+                       r"(fact_transactions|fact_customer_features).{0,160}"
+                       r"(fact_customer_features|fact_transactions)|"
+                       r"không (khớp|trùng|reconcile|thống nhất)|do(es)? not reconcile|"
+                       r"(chỉ|only) .{0,20}200 (khách|customers)|200 khách|"
+                       r"(tập con|subset|không đại diện|not representative)|"
+                       r"khác nhau .{0,40}(nguồn|cách tính|bảng)|"
+                       r"feature store.{0,80}(khác|different|lệch)",
     "cancelled_no_fact": r"catalogue_only|catalogue|chưa có .{0,30}fact|no cancelled fact|"
                          r"không có .{0,20}fact .{0,20}(hủy|huỷ|cancel)|"
                          r"(chưa|không) .{0,30}(nạp|materiali[sz]|reconcile)|"
@@ -169,6 +181,20 @@ QUESTIONS = [
                  "chỉ có completed. Holdout H008 = unsupported."),
         "require": ["cancelled_no_fact"],
         "query_is_bad": True,
+    },
+    {
+        # Unlike H9, nothing here is withheld -- both sources are servable and
+        # both answer the question, with different numbers. The failure mode is
+        # picking one and presenting it as the answer.
+        "id": "H10",
+        "question": ("Trung bình mỗi khách hàng GSM hoàn thành bao nhiêu giao dịch "
+                     "trong 3 tháng gần nhất?"),
+        "trap": ("Feature store cho 4,355 (l3m @2025-12, 200 khách VIP); tính từ "
+                 "fact Q4/2025 cho 5,986 trên mọi khách, hoặc 5,419 trên đúng 200 "
+                 "khách đó. Hai nguồn không reconcile vì feature lấy từ phân phối "
+                 "của workbook nguồn, không dẫn xuất từ fact này."),
+        "require": ["source_mismatch"],
+        "query_is_bad": False,
     },
 ]
 

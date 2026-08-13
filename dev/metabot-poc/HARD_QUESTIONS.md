@@ -40,6 +40,8 @@ verdict tự động chỉ để phân loại nhanh; báo cáo luôn in nguyên 
 | `customer_id` distinct trong giao dịch | **1.979** |
 | `global_customer_id` distinct trong giao dịch | **2.025** |
 | Cột `active` / `churn` | **không tồn tại** ở bất kỳ đâu |
+| Feature có phân phối thật | **163/824** toàn dự án; **8/20** trong số đang phục vụ |
+| Feature sinh bằng heuristic | 661/824; **12/20** đang phục vụ — gồm **toàn bộ** feature event |
 | Loyalty / điểm thưởng | có ở `silver`, **không** expose cho reader |
 | Số lượng unit / xe bán ra | không có cột nào |
 
@@ -169,6 +171,26 @@ chưa có fact hủy nào được nạp và kiểm chứng nên chưa trả đ�
 
 Đã chạy tay một lần và đạt: MetaBot tự tìm tới catalogue, trích `catalogue_only`
 và nêu đúng lý do. Nhưng chỉ **một lần** — chưa đủ để kết luận hành vi ổn định.
+
+### H10 — Hai nguồn cùng trả lời được, và lệch nhau
+> Trung bình mỗi khách hàng GSM hoàn thành bao nhiêu giao dịch trong 3 tháng gần nhất?
+
+Khác H9 ở chỗ **không có gì bị giấu**: cả hai nguồn đều servable, đều trả lời được,
+và cho số khác nhau.
+
+| Nguồn | Số |
+| --- | ---: |
+| `fact_customer_features`, `l3m` @2025-12 (200 khách) | **4,355** |
+| Tính từ `fact_transactions`, Q4/2025, mọi khách GSM | **5,986** |
+| Tính từ `fact_transactions`, Q4/2025, đúng 200 khách đó | **5,419** |
+
+Dòng thứ ba là dòng quan trọng: **ngay cả trên cùng một tập người, hai nguồn vẫn
+lệch**. Không phải do khác cohort — mà do feature được lấy mẫu từ phân phối của
+workbook nguồn, không hề dẫn xuất từ bảng fact này.
+
+**Đúng:** nêu có hai nguồn cho cùng một câu hỏi và chúng không reconcile; hoặc chỉ
+ra feature store chỉ phủ 200 khách (đều là VIP) nên không đại diện.
+**Sai:** chọn một con số và trình bày như đáp án duy nhất.
 
 ## Kết quả sau khi mở rộng bề mặt lên 6 bảng (2026-08-13)
 
