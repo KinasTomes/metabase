@@ -173,7 +173,7 @@ chưa có fact hủy nào được nạp và kiểm chứng nên chưa trả đ�
 và nêu đúng lý do. Nhưng chỉ **một lần** — chưa đủ để kết luận hành vi ổn định.
 
 ### H10 — Hai nguồn cùng trả lời được, và lệch nhau
-> Trung bình mỗi khách hàng GSM hoàn thành bao nhiêu giao dịch trong 3 tháng gần nhất?
+> Trong quý 4 năm 2025, trung bình mỗi khách hàng GSM hoàn thành bao nhiêu giao dịch?
 
 Khác H9 ở chỗ **không có gì bị giấu**: cả hai nguồn đều servable, đều trả lời được,
 và cho số khác nhau.
@@ -191,6 +191,30 @@ workbook nguồn, không hề dẫn xuất từ bảng fact này.
 **Đúng:** nêu có hai nguồn cho cùng một câu hỏi và chúng không reconcile; hoặc chỉ
 ra feature store chỉ phủ 200 khách (đều là VIP) nên không đại diện.
 **Sai:** chọn một con số và trình bày như đáp án duy nhất.
+
+> **Đã sửa cách hỏi (2026-08-13).** Bản đầu hỏi "trong 3 tháng gần nhất". MetaBot
+> quy chiếu vào đồng hồ thật — tháng 5–7/2026, khoảng không có dữ liệu — rồi trình
+> bày kết quả rỗng như một con số. Lỗi thật, nhưng là **lỗi của H3**, và nó nổ ra
+> trước khi model kịp nhìn tới nguồn thứ hai, nên câu hỏi không đo được thứ nó sinh
+> ra để đo. Giờ dùng mốc tuyệt đối.
+
+## Ngày tương đối: điểm yếu lặp lại nhiều nhất
+
+Ba lần độc lập, cùng một kiểu hỏng:
+
+| Lần | Câu hỏi | Model hiểu | Kết quả |
+| --- | --- | --- | --- |
+| H3 | "tháng này" | 8/2026 | rỗng, trình bày như số liệu |
+| H10 bản đầu | "3 tháng gần nhất" | 5–7/2026 | rỗng, trình bày như số liệu |
+| H3 (lần chạy trước) | "tháng này" | — | **bắt được**, nêu khoảng dữ liệu |
+
+Đây là điểm yếu **dễ tái hiện nhất** tìm được cho tới giờ, và nó nguy hiểm vì kết
+quả rỗng trông y hệt một kết quả hợp lệ bằng 0. Mô tả cột `transaction_date` đã ghi
+rõ "Data covers 2025-01-01 to 2025-12-28 only" mà vẫn không đủ để chặn.
+
+Đáng thử tiếp: liệu có cần một câu cảnh báo mạnh hơn ngay trong mô tả cột ngày,
+kiểu "bất kỳ filter tương đối nào (tháng này, quý gần nhất) sẽ trả về rỗng — hãy nói
+rõ điều đó thay vì báo 0".
 
 ## Kết quả sau khi mở rộng bề mặt lên 6 bảng (2026-08-13)
 

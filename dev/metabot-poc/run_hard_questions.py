@@ -186,9 +186,15 @@ QUESTIONS = [
         # Unlike H9, nothing here is withheld -- both sources are servable and
         # both answer the question, with different numbers. The failure mode is
         # picking one and presenting it as the answer.
+        # The window is spelled out. An earlier phrasing said "trong 3 tháng gần
+        # nhất", and Metabot resolved that against the real clock -- May to July
+        # 2026, where there is no data -- then reported the empty result without
+        # noticing. A real failure, but H3's failure, and it fired before the
+        # model ever looked at a second source, so this question measured
+        # nothing it was built to measure. Absolute dates isolate the trap.
         "id": "H10",
-        "question": ("Trung bình mỗi khách hàng GSM hoàn thành bao nhiêu giao dịch "
-                     "trong 3 tháng gần nhất?"),
+        "question": ("Trong quý 4 năm 2025, trung bình mỗi khách hàng GSM hoàn thành "
+                     "bao nhiêu giao dịch?"),
         "trap": ("Feature store cho 4,355 (l3m @2025-12, 200 khách VIP); tính từ "
                  "fact Q4/2025 cho 5,986 trên mọi khách, hoặc 5,419 trên đúng 200 "
                  "khách đó. Hai nguồn không reconcile vì feature lấy từ phân phối "
@@ -321,6 +327,28 @@ def reclassify():
     return 0
 
 
+def sort_key(question_id):
+    """H2 before H10 — plain string order would put H10 second."""
+    digits = "".join(c for c in question_id if c.isdigit())
+    return (int(digits) if digits else 0, question_id)
+
+
+def load_previous():
+    """Keep earlier results so re-running a subset does not discard the rest.
+
+    Running two questions used to overwrite the file with just those two,
+    silently throwing away the other eight. The acceptance runner has merged
+    from the start; this one did not, and re-running a subset is exactly how
+    these get worked through.
+    """
+    if not RESULTS_PATH.exists():
+        return {}
+    try:
+        return {r["id"]: r for r in json.loads(RESULTS_PATH.read_text(encoding="utf-8"))}
+    except (json.JSONDecodeError, KeyError, TypeError):
+        return {}
+
+
 def main():
     args = [a for a in sys.argv[1:]]
     if "--reclassify" in args:
@@ -334,22 +362,25 @@ def main():
     MC.authenticate()
     print(f"Running {len(todo)} hard question(s)\n", flush=True)
 
-    records = []
+    merged = load_previous()
     for spec in todo:
         print(f"[{spec['id']}] {spec['question'][:60]}", flush=True)
         record = run_one(spec)
-        records.append(record)
+        merged[spec["id"]] = record
         print(f"      {record['verdict']}: {record['detail']}  ({record['seconds']}s)\n", flush=True)
-        RESULTS_PATH.write_text(json.dumps(records, ensure_ascii=False, indent=2), encoding="utf-8")
+        ordered = [merged[k] for k in sorted(merged, key=sort_key)]
+        RESULTS_PATH.write_text(json.dumps(ordered, ensure_ascii=False, indent=2), encoding="utf-8")
         if spec is not todo[-1]:
             time.sleep(QUESTION_DELAY)
 
-    write_report(records)
+    all_records = [merged[k] for k in sorted(merged, key=sort_key)]
+    write_report(all_records)
 
-    good = sum(1 for r in records if r["verdict"] == "GOOD")
-    review = sum(1 for r in records if r["verdict"] == "REVIEW")
+    good = sum(1 for r in all_records if r["verdict"] == "GOOD")
+    review = sum(1 for r in all_records if r["verdict"] == "REVIEW")
     print("=" * 60)
-    print(f"GOOD {good}/{len(records)}   (REVIEW {review} — cần đọc tay)")
+    print(f"this run: {len(todo)} question(s)")
+    print(f"overall:  GOOD {good}/{len(all_records)}   (REVIEW {review} — cần đọc tay)")
     print(f"  {REPORT_PATH}")
     return 0
 
