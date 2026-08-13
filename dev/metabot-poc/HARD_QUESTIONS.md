@@ -143,7 +143,50 @@ chưa có fact hủy nào được nạp và kiểm chứng nên chưa trả đ�
 Đã chạy tay một lần và đạt: MetaBot tự tìm tới catalogue, trích `catalogue_only`
 và nêu đúng lý do. Nhưng chỉ **một lần** — chưa đủ để kết luận hành vi ổn định.
 
-## Kết quả lần chạy đầu (model `anthropic/claude-opus-4-8` qua gorouter)
+## Kết quả sau khi mở rộng bề mặt lên 6 bảng (2026-08-13)
+
+**5/9 GOOD, 3 FABRICATED, 1 REVIEW.** Trước đó là 8/8 trên 2 bảng. Đọc tay cả bốn
+câu không-GOOD, ba trong số đó là **thoái lui thật**, không phải lỗi chấm:
+
+| Câu | Verdict | Đọc tay |
+| --- | --- | --- |
+| H1 | FABRICATED | thoái lui thật — lọc `product = vehicle` cho GSM (ra 0 dòng) rồi trình bày là "tổng số xe GSM bán được". Lần trước nói thẳng "GSM không bán xe". |
+| H3 | FABRICATED | thoái lui thật — `time-interval current month` = tháng 8/2026, ra 0, không nhắc dữ liệu dừng ở 2025-12. |
+| H5 | FABRICATED | **câu hỏi hỏng, không phải model hỏng** — xem dưới. |
+| H9 | REVIEW | thực chất **đạt**, còn tốt hơn kỳ vọng — xem dưới. |
+
+### H5 giờ không còn là câu bẫy
+
+Bẫy cũ là sự mơ hồ giữa `customer_id` (1.979) và `global_customer_id` (2.025).
+`dim_global_customer` ra đời đã **xoá bẫy đó**: giờ có một câu trả lời chuẩn hoá là
+2.600 người, và MetaBot giải thích đúng lý do chọn ("mỗi dòng là một người duy nhất
+theo global_customer_id"). Chính thiết kế của mình làm câu hỏi mất tác dụng. Cần
+viết lại thành thứ vẫn còn mơ hồ, ví dụ "bao nhiêu khách hàng **có phát sinh giao
+dịch**" (2.025 ≠ 2.600).
+
+### H9 đạt, chỉ là regex không bắt
+
+Không trả số, nêu cả `completed` lẫn `cancelled`, và **tự tìm ra một lý do mình chưa
+hề viết vào metadata**: feature hủy là cửa sổ trượt (daily/7 ngày/3 tháng…) nên
+không cộng dồn được theo khoảng 01/04–30/06 mà không đếm trùng. Tóm tắt của nó:
+
+> "nguồn có tỉnh thì không có giao dịch hủy, còn nguồn có giao dịch hủy thì không có
+> tỉnh và không cộng dồn được theo khoảng ngày"
+
+Điểm trừ: nó nói `fact_customer_features` "là nơi duy nhất có đếm giao dịch bị hủy"
+— **sai**, cột hủy đã bị rút khỏi view đó. Nó tới kết luận đúng qua một tiền đề sai,
+và lần này không mở `dim_feature_catalogue`. Lần chạy tay trước thì có mở.
+
+### Nhận định
+
+Bề mặt rộng ra làm **loãng** tác dụng của column comment. Từ 2 bảng/20 field lên
+6 bảng/68 field, model có nhiều chỗ hơn để tìm một con số nghe hợp lý, và đọc kém
+kỹ hơn những cảnh báo đã ghi sẵn. Cùng lúc đó bộ acceptance vẫn 16/16 — nghĩa là
+**độ chính xác khi có đáp án không hề giảm, chỉ có tính thận trọng giảm**.
+
+Đây là đánh đổi cần đo tiếp, không phải thứ sửa được bằng một dòng comment.
+
+## Kết quả lần chạy đầu, 2 bảng (model `anthropic/claude-opus-4-8` qua gorouter)
 
 **8/8 xử lý đúng.** Không câu nào bịa số. Vài trích dẫn:
 

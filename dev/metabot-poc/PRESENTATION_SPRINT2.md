@@ -68,10 +68,10 @@ không ai nhắc. Đây là lý do bỏ hẳn hướng sửa prompt.
 chấm văn bản. Câu trả lời nghe hợp lý mà không có truy vấn phía sau bị đánh
 `NO_QUERY`, không phải PASS.
 
-| Bộ | Số câu | Đo cái gì |
-| --- | ---: | --- |
-| `run_acceptance.py` | 16 | số có đúng không |
-| `run_hard_questions.py` | 9 | khi không có đáp án, nó nêu giới hạn hay bịa |
+| Bộ | Số câu | Đo cái gì | Kết quả 2026-08-13 |
+| --- | ---: | --- | --- |
+| `run_acceptance.py` | 16 | số có đúng không | **16/16 PASS** |
+| `run_hard_questions.py` | 9 | khi không có đáp án, nó nêu giới hạn hay bịa | 5/9 GOOD (đọc tay: 6/9) |
 
 Nói rõ vì sao thêm câu 14–16: bộ 13 câu cũ **đều trả lời được từ một bảng**, nên
 13/13 không chứng minh được gì về join. Ba câu mới nhóm theo cột chỉ có trong
@@ -79,9 +79,27 @@ dimension nên join là bắt buộc.
 
 Câu 16 là câu bẫy: `dim_customer` có grain `(customer_id, pnl)`, join thiếu `pnl` sẽ
 **nhân đôi mọi con số**. Tổng ba nhóm phải bằng đúng đáp án câu 1 — kiểm được cả
-fan-out lẫn giá trị.
+fan-out lẫn giá trị. Cả ba câu join đều PASS, nên ô "chưa đo" ở slide 3 đã đóng.
 
-> Điền số thật vào đây sau khi chạy.
+### Phần thú vị hơn con số 16/16 (dành 1 phút cho slide này)
+
+Bộ câu khó **tụt từ 8/8 xuống 5/9** đúng lúc bề mặt mở từ 2 bảng lên 6. Đọc tay
+từng câu thì:
+
+- **H1, H3 thoái lui thật.** H1 lọc `product = vehicle` cho GSM (ra 0) rồi gọi đó là
+  "số xe GSM bán được"; H3 lấy "tháng này" = 8/2026 (ra 0) mà không nhắc dữ liệu
+  dừng ở 2025-12. Trước đó nó bắt được cả hai.
+- **H5 là câu hỏi hỏng, không phải model hỏng.** Bẫy cũ là mơ hồ giữa hai cách đếm
+  khách; `dim_global_customer` mà mình thêm vào đã xoá bẫy đó. Phải viết lại câu hỏi.
+- **H9 thực chất đạt**, chỉ là regex không bắt.
+
+Kết luận nên nói thẳng: **độ chính xác không giảm, tính thận trọng thì có.** Bề mặt
+rộng ra làm loãng tác dụng của column comment — 68 field thay vì 20, model có nhiều
+chỗ hơn để tìm một con số nghe hợp lý. Đây là đánh đổi cần đo tiếp, không phải thứ
+vá bằng một dòng comment.
+
+Đây là slide thể hiện rõ nhất rằng bộ đo đang làm đúng việc của nó: nếu chỉ nhìn
+16/16 thì sẽ tưởng mọi thứ đều tốt lên.
 
 ## 6. Điểm nhấn kỹ thuật — vì sao bot từ chối đúng cách (4 phút)
 

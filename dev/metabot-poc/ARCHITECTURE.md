@@ -149,8 +149,19 @@ Nên phân tách là **cấu trúc**, không phải văn bản:
 - `dim_feature_catalogue` — đủ 34, kèm `serving_status` và `not_servable_reason`.
 
 Lý do từ chối trở thành **dữ liệu** để model trích dẫn, thay vì một câu nó phải tự
-nghĩ ra. Kết quả đo được: MetaBot tìm tới catalogue, trích `catalogue_only`, nêu
-đúng ràng buộc data contract, và không trả số nào.
+nghĩ ra.
+
+Đo hai lần, và kết quả khác nhau ở chỗ đáng chú ý. Lần đầu MetaBot mở catalogue,
+trích `catalogue_only` và dẫn đúng ràng buộc data contract. Lần thứ hai nó **không**
+mở catalogue, thậm chí còn tin nhầm rằng `fact_customer_features` vẫn chứa cột hủy —
+nhưng vẫn từ chối, vì cột đó thực sự không tồn tại để mà truy vấn. Nó còn tự tìm ra
+một lý do mình chưa hề viết vào metadata: feature hủy là cửa sổ trượt nên không cộng
+dồn được theo khoảng ngày mà không đếm trùng.
+
+Rút ra: **phần chặn hiệu quả là việc rút cột, không phải câu chữ trong catalogue.**
+Catalogue cải thiện *chất lượng lời giải thích* khi model chịu đọc, nhưng thứ bảo
+đảm không có con số nào lọt ra là cấu trúc. Đúng như dự đoán, chỉ là bằng chứng đến
+theo đường vòng.
 
 Bài học rút ra khi làm phần này: bản đầu tôi *mô tả* mâu thuẫn trong comment rồi coi
 là xong. **Mô tả cái bẫy không phải là đóng nó lại** — cột vẫn truy vấn được, và
@@ -237,8 +248,8 @@ sang 2024-12. Mọi phép ép kiểu ngày giờ đều ghim `AT TIME ZONE 'UTC'
 
 ## 9. Còn thiếu
 
-- **Chưa chạy lại baseline** sau khi bề mặt đổi từ 2 lên 6 bảng. Con số 13/13 cũ
-  không còn so sánh được.
-- **Câu 14–16 chưa chạy lần nào** — nên khả năng join vẫn **chưa có bằng chứng**.
-- H9 mới chạy tay một lần.
+- Baseline đã chạy lại: **16/16** acceptance, **5/9** hard (đọc tay 6/9).
+  Ba câu FABRICATED/REVIEW đã phân tích trong `HARD_QUESTIONS.md`.
+- Câu 14–16 đã PASS — khả năng join **đã có bằng chứng**.
+- H5 cần viết lại: `dim_global_customer` đã xoá mất sự mơ hồ mà câu đó dùng để bẫy.
 - Sprint 3 (quét chủ động, đẩy summary lên kênh) chưa bắt đầu.
