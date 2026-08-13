@@ -216,6 +216,32 @@ rõ "Data covers 2025-01-01 to 2025-12-28 only" mà vẫn không đủ để ch�
 kiểu "bất kỳ filter tương đối nào (tháng này, quý gần nhất) sẽ trả về rỗng — hãy nói
 rõ điều đó thay vì báo 0".
 
+## So sánh hai model trên cùng bộ dữ liệu (2026-08-13)
+
+Sau khi chuyển gateway sang `api.vietapi.tech`, chạy lại toàn bộ với
+`openrouter/gpt-5.6-luna`. Mô tả cột đã được xác minh khớp Postgres ở cả hai lượt.
+
+| | `claude-opus-4-8` | `gpt-5.6-luna` |
+| --- | --- | --- |
+| Acceptance | **16/16** | 14/16 |
+| Hard GOOD | 5/9 | 4/10 |
+
+Hai câu acceptance sai đều cùng một nguyên nhân: lọc `fact_events` theo
+`dim_global_customer.has_gsm` qua FK thay vì `pnl = 'gsm'`, nên vơ luôn event
+VinFast của người có tài khoản GSM (33.961 thay vì 20.049).
+
+**Thêm cảnh báo vào mô tả `has_gsm` không sửa được.** Sau khi viết rõ "đây là
+thuộc tính của người, không phải của dòng; muốn lọc theo công ty thì dùng `pnl`",
+chạy lại vẫn ra **đúng con số sai cũ**. Đây là bằng chứng ngược lại kỳ vọng, và nó
+đáng ghi hơn một kết quả xanh.
+
+Đáng chú ý hơn: `gpt-5.6-luna` trả lời rất cụt. H6 (so sánh GSM–VinFast) nó vẽ
+biểu đồ mà **không nhắc doanh thu VinFast bằng 0** — chính câu vẫn được dùng làm ví
+dụ tiêu biểu cho "tầng ngữ nghĩa hoạt động". Cùng bộ mô tả, opus nêu, luna không.
+
+Kết luận cần phát biểu cẩn thận: **mô tả là điều kiện cần chứ không đủ.** Nó đặt sự
+thật vào tầm với của model; đọc và thuật lại hay không là thuộc tính của model.
+
 ## Kết quả sau khi mở rộng bề mặt lên 6 bảng (2026-08-13)
 
 **5/9 GOOD, 3 FABRICATED, 1 REVIEW.** Trước đó là 8/8 trên 2 bảng. Đọc tay cả bốn

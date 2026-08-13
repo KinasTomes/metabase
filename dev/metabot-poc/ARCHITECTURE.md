@@ -73,11 +73,38 @@ Lưu ý một cái bẫy đã xác minh: đường context còn lại — `forma
 mang **tên cột và kiểu**, không mang mô tả. Nếu comment không sync được, model
 vẫn chạy bình thường, chỉ là mù. Hỏng im lặng, nên phải có bước verify.
 
-### Hệ quả: prompt engineering hoá ra là thứ yếu
+### Cạm bẫy lớn nhất: sync không cập nhật mô tả đã có
 
-Đã đo: MetaBot tự nêu ra doanh thu VinFast bằng 0, khoảng dữ liệu 2025, và
-`status` toàn `completed` — **chỉ nhờ column comment**, không cần một dòng prompt
-nào. Kết luận này là lý do Phase 3 (sửa prompt qua fork) bị bỏ.
+Metabase chép comment **một lần duy nhất, lúc sync phát hiện ra cột**. Sau đó nó
+không đụng vào `description` nữa. Nghĩa là **mọi lần sửa `COMMENT ON` của một cột
+đã tồn tại đều bị bỏ qua**, im lặng.
+
+Phát hiện muộn, sau khi đã sửa comment nhiều lần: `fact_transactions.status` trong
+Metabase vẫn là câu cũ *"Every row in this dataset is 'completed'"* rất lâu sau khi
+nó được viết lại. 18 mô tả đã lệch mà không ai biết.
+
+`verify_descriptions()` không bắt được vì nó hỏi "có mô tả không", chứ không hỏi
+"có đúng mô tả hiện tại không" — xanh suốt trong khi thực tế đã trôi.
+
+Cách xử lý: `push_descriptions()` đọc thẳng `pg_description` rồi `PUT` những mô tả
+lệch qua API. Kho dữ liệu là nguồn chân lý, nên không thể phụ thuộc vào một bước
+sync coi giá trị đầu tiên nó thấy là vĩnh viễn.
+
+### Hệ quả: prompt engineering là thứ yếu — nhưng tầng ngữ nghĩa không đủ
+
+Với `claude-opus-4-8`, MetaBot tự nêu doanh thu VinFast bằng 0, khoảng dữ liệu
+2025, và `status` toàn `completed` — **chỉ nhờ column comment**, không cần dòng
+prompt nào. Đó là lý do Phase 3 bị bỏ.
+
+Nhưng đo lại với `gpt-5.6-luna` trên **đúng bộ mô tả đó** (đã xác minh khớp
+Postgres) thì nó trả lời cụt lủn, không nhắc lại cảnh báo nào: hỏi so sánh doanh
+thu GSM–VinFast, nó vẽ biểu đồ và im lặng về việc VinFast bằng 0.
+
+Nên phát biểu cho đúng: **mô tả là điều kiện cần, không phải điều kiện đủ.** Nó
+đặt sự thật vào tầm với của model; việc model có đọc và thuật lại hay không là
+thuộc tính của model. Một cảnh báo viết thẳng vào `has_gsm` rằng "đừng dùng cờ này
+để lọc fact theo công ty" **không** ngăn được `gpt-5.6-luna` làm đúng điều đó —
+câu 10 và 12 sai y nguyên con số cũ sau khi thêm cảnh báo.
 
 ## 4. Tầng ngữ nghĩa: `analytics`
 
