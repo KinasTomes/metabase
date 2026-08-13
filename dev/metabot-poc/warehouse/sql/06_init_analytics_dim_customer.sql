@@ -72,8 +72,8 @@ COMMENT ON COLUMN analytics.dim_global_customer.global_customer_id IS
 COMMENT ON COLUMN analytics.dim_global_customer.is_vip IS
     'Whether the person is flagged VIP (khách hàng VIP) in any PnL. The two profiles always agree on this field.';
 COMMENT ON COLUMN analytics.dim_global_customer.has_gsm IS
-    'Whether this person has a GSM customer profile (có dùng GSM).';
+    'Whether this PERSON has a GSM customer profile (có dùng GSM). NOT a way to select GSM activity: someone with has_gsm usually holds a VinFast account too, so filtering fact_transactions or fact_events by has_gsm also counts their VinFast rows. To count GSM transactions or events, filter pnl = ''gsm'' (or company = ''GSM'') on the fact itself. Use this flag only for questions about the customer, such as who holds an account with which company.';
 COMMENT ON COLUMN analytics.dim_global_customer.has_vinfast IS
-    'Whether this person has a VinFast customer profile (có dùng VinFast). Combine with has_gsm to find customers who use both companies (khách hàng dùng cả hai).';
+    'Whether this PERSON has a VinFast customer profile (có dùng VinFast). Same caution as has_gsm: it selects people, not rows — filter the fact''s own pnl/company column to scope activity by company. Combine with has_gsm to find customers who use both companies (khách hàng dùng cả hai).';
 COMMENT ON COLUMN analytics.dim_global_customer.pnl_count IS
     'How many PnL units this person appears in (1 or 2).';

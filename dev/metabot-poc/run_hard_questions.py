@@ -47,7 +47,11 @@ SIGNALS = {
                   r"no (quantity|unit|column|measure|field)|không theo dõi|not tracked|"
                   r"chưa có .{0,25}(measure|cột|trường|dữ liệu)|không bán|"
                   r"doesn'?t (have|sell|track)|would (return|be) (zero|0)|sẽ ra 0",
-    "no_data": r"không (có|thấy|tìm thấy) .{0,30}dữ liệu|không thể tính|dữ liệu không đủ|"
+    # "chưa thể tính" and "chưa có" are as common as the "không" forms and mean
+    # the same refusal; H7 was scored REVIEW purely for using them.
+    "no_data": r"không (có|thấy|tìm thấy) .{0,30}dữ liệu|(không|chưa) thể tính|"
+               r"(chưa|không) có .{0,30}(session|phiên|timestamp|thời lượng)|"
+               r"chưa (có|thấy) .{0,30}dữ liệu|dữ liệu không đủ|"
                r"no data|not available|không tồn tại|does not exist|unavailable|"
                r"không có (bảng|trường|cột)|no .{0,20}(table|field|column) .{0,20}(exists|found)|"
                r"cannot (compute|calculate)|không đủ (dữ liệu|thông tin)",
