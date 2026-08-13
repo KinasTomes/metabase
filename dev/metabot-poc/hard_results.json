@@ -1,0 +1,196 @@
+[
+  {
+    "id": "H1",
+    "question": "GSM bán được bao nhiêu xe trong toàn bộ dữ liệu?",
+    "trap": "Không có cột số lượng; GSM cũng không bán sản phẩm 'vehicle'.",
+    "require": [
+      "no_measure"
+    ],
+    "query_is_bad": false,
+    "verdict": "GOOD",
+    "detail": "named the limitation (with a query)",
+    "signals": {
+      "no_measure": true
+    },
+    "tools": [
+      "read_resource",
+      "read_resource",
+      "load_skill",
+      "construct_notebook_query"
+    ],
+    "built_query": true,
+    "answer": "The schema tells an important story here: in this dataset, \"xe\" (vehicle) is a product sold by **VinFast**, not GSM. GSM's product lines are taxi, bike, food, and express — it's a mobility/delivery operator and doesn't have a \"vehicle\" sales line. So a literal \"GSM vehicles sold\" filter would return zero, which would be misleading rather than informative.\n\nLet me show you what GSM actually sold, broken down by product, so the picture is clear.The data reveals a mismatch with the question, so let me build something that surfaces it clearly.Có một điểm cần làm rõ về dữ liệu: trong [fact_transactions](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE3OH19LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=), GSM **không bán \"xe\"**. Sản phẩm của GSM là dịch vụ taxi, bike, food, express — còn \"vehicle\" (xe) là dòng sản phẩm của VinFast, không phải GSM. Nếu lọc thẳng GSM + vehicle sẽ ra 0, dễ gây hiểu nhầm.\n\nNên thay vào đó tôi dựng biểu đồ [GSM transactions by product](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsic291cmNlLXRhYmxlIjoxNzgsImFnZ3JlZ2F0aW9uIjpbWyJjb3VudCJdXSwiYnJlYWtvdXQiOltbImZpZWxkIiwxNzM0LHsiYmFzZS10eXBlIjoidHlwZS9UZXh0In1dXSwib3JkZXItYnkiOltbImRlc2MiLFsiYWdncmVnYXRpb24iLDAseyJiYXNlLXR5cGUiOiJ0eXBlL0JpZ0ludGVnZXIifV1dXSwiZmlsdGVyIjpbIj0iLFsiZmllbGQiLDE3MzIseyJiYXNlLXR5cGUiOiJ0eXBlL1RleHQifV0sIkdTTSJdfX0sImRpc3BsYXlJc0xvY2tlZCI6dHJ1ZSwiZGlzcGxheSI6ImJhciJ9) — số giao dịch của GSM theo từng dòng sản phẩm trên toàn bộ dữ liệu — để bạn thấy GSM thực sự \"bán\" (giao dịch) những gì.\n\nNếu ý bạn là:\n- Số xe **VinFast** bán được (product = vehicle) — tôi dựng ngay.\n- Số chuyến xe của GSM (taxi + bike) — tôi cũng có thể lọc theo đó.\n\nBạn muốn hướng nào?",
+    "seconds": 70.1
+  },
+  {
+    "id": "H2",
+    "question": "Tổng điểm thưởng loyalty của khách hàng GSM là bao nhiêu?",
+    "trap": "Loyalty có ở silver nhưng không expose cho reader.",
+    "require": [
+      "no_data"
+    ],
+    "query_is_bad": true,
+    "verdict": "GOOD",
+    "detail": "named the limitation",
+    "signals": {
+      "no_data": true
+    },
+    "tools": [
+      "search",
+      "search",
+      "read_resource",
+      "read_resource",
+      "read_resource"
+    ],
+    "built_query": false,
+    "answer": "No loyalty entities surfaced. Let me look at what tables exist in the warehouse to see if there's a customer/loyalty table.Mình đã tìm nhưng không thấy dữ liệu về điểm thưởng loyalty ở instance này.\n\nKho dữ liệu BI Warehouse chỉ có hai bảng:\n- [Fact Transactions](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE3OH19LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=) — doanh thu và số giao dịch (không có trường điểm thưởng)\n- [Fact Events](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE3N319LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=) — sự kiện/tương tác trên app (app_open, search, booking_created…)\n\nKhông có bảng, model hay metric nào chứa \"loyalty\" hay \"điểm thưởng\", và cũng không có cột nào liên quan đến điểm thưởng trong hai bảng trên. Vì vậy mình không thể tính tổng điểm thưởng loyalty của khách hàng GSM.\n\nNếu bạn muốn, mình có thể xây các phân tích khác cho GSM từ dữ liệu hiện có — ví dụ tổng doanh thu, số giao dịch, số khách hàng duy nhất, hoặc số lượng sự kiện tương tác. Bạn muốn xem cái nào?",
+    "seconds": 30.0
+  },
+  {
+    "id": "H3",
+    "question": "Doanh thu completed của GSM tháng này là bao nhiêu?",
+    "trap": "Dữ liệu dừng 2025-12-28; 'tháng này' rỗng.",
+    "require": [
+      "date_range"
+    ],
+    "query_is_bad": false,
+    "verdict": "GOOD",
+    "detail": "named the limitation (with a query)",
+    "signals": {
+      "date_range": true
+    },
+    "tools": [
+      "read_resource",
+      "read_resource",
+      "read_resource",
+      "load_skill",
+      "construct_notebook_query",
+      "construct_notebook_query",
+      "construct_notebook_query",
+      "construct_notebook_query"
+    ],
+    "built_query": true,
+    "answer": "The data has a wrinkle worth flagging before I build. Let me construct the query.[Doanh thu completed GSM — tháng gần nhất (2025-12)](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsic291cmNlLXRhYmxlIjoxNzgsImFnZ3JlZ2F0aW9uIjpbWyJzdW0iLFsiZmllbGQiLDE3MzcseyJiYXNlLXR5cGUiOiJ0eXBlL0RlY2ltYWwifV1dXSwiZmlsdGVyIjpbImFuZCIsWyI9IixbImZpZWxkIiwxNzMyLHsiYmFzZS10eXBlIjoidHlwZS9UZXh0In1dLCJHU00iXSxbIj0iLFsiZmllbGQiLDE3MzYseyJiYXNlLXR5cGUiOiJ0eXBlL1RleHQifV0sImNvbXBsZXRlZCJdLFsiPSIsWyJmaWVsZCIsMTczMSx7ImJhc2UtdHlwZSI6InR5cGUvVGV4dCJ9XSwiMjAyNS0xMiJdXX19LCJkaXNwbGF5SXNMb2NrZWQiOnRydWUsImRpc3BsYXkiOiJzY2FsYXIifQ==)\n\nLưu ý quan trọng: bảng [fact_transactions](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE3OH19LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=) chỉ có dữ liệu từ 2025-01-01 đến 2025-12-28 — không có dữ liệu của tháng hiện tại (tháng 8/2026). Vì vậy nếu lọc đúng \"tháng này\" thì kết quả sẽ trống. Mình đã lấy tháng gần nhất có dữ liệu là 2025-12 làm đại diện, lọc company = GSM và status = 'completed'.\n\nNếu bạn muốn xem một tháng cụ thể khác hoặc toàn bộ doanh thu GSM theo từng tháng của năm 2025, mình dựng lại ngay.",
+    "seconds": 334.2
+  },
+  {
+    "id": "H4",
+    "question": "Số giao dịch cancelled của GSM là bao nhiêu?",
+    "trap": "Cột status có thật nhưng chỉ chứa 'completed'.",
+    "require": [
+      "only_completed"
+    ],
+    "query_is_bad": false,
+    "verdict": "GOOD",
+    "detail": "named the limitation (with a query)",
+    "signals": {
+      "only_completed": true
+    },
+    "tools": [
+      "read_resource",
+      "read_resource",
+      "read_resource",
+      "load_skill",
+      "construct_notebook_query",
+      "construct_notebook_query",
+      "construct_notebook_query"
+    ],
+    "built_query": true,
+    "answer": "The status field's description says every row in this table is `completed` — there's no `cancelled` value to filter on. Let me confirm the sample values before concluding.Let me retry with the query structured cleanly.I built the count of [GSM cancelled transactions](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsic291cmNlLXRhYmxlIjoxNzgsImFnZ3JlZ2F0aW9uIjpbWyJjb3VudCJdXSwiZmlsdGVyIjpbImFuZCIsWyI9IixbImZpZWxkIiwxNzMyLHsiYmFzZS10eXBlIjoidHlwZS9UZXh0In1dLCJHU00iXSxbIj0iLFsiZmllbGQiLDE3MzYseyJiYXNlLXR5cGUiOiJ0eXBlL1RleHQifV0sImNhbmNlbGxlZCJdXX19LCJkaXNwbGF5SXNMb2NrZWQiOnRydWUsImRpc3BsYXkiOiJzY2FsYXIifQ==) from the [fact_transactions](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE3OH19LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=) table, filtering company = GSM and status = cancelled.\n\nOne caveat: the STATUS field's description states every row in this dataset is `completed`, and the only observed value is `completed` — so this query will likely return 0. If cancelled transactions live in a different table, let me know and I'll look elsewhere.",
+    "seconds": 155.9
+  },
+  {
+    "id": "H5",
+    "question": "Có bao nhiêu khách hàng trong dữ liệu?",
+    "trap": "customer_id cho 1979, global_customer_id cho 2025.",
+    "require": [
+      "ambiguous"
+    ],
+    "query_is_bad": false,
+    "verdict": "GOOD",
+    "detail": "named the limitation (with a query)",
+    "signals": {
+      "ambiguous": true
+    },
+    "tools": [
+      "search",
+      "read_resource",
+      "load_skill",
+      "construct_notebook_query"
+    ],
+    "built_query": true,
+    "answer": "No customer-related entity surfaced from search. Let me look at the tables in play and the database structure.There's no dedicated customer table; unique customers are tracked via the Global Customer ID field. Let me build the count.[Số khách hàng](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsic291cmNlLXRhYmxlIjoxNzgsImFnZ3JlZ2F0aW9uIjpbWyJkaXN0aW5jdCIsWyJmaWVsZCIsMTczOSx7ImJhc2UtdHlwZSI6InR5cGUvVGV4dCJ9XV1dfX0sImRpc3BsYXlJc0xvY2tlZCI6dHJ1ZSwiZGlzcGxheSI6InNjYWxhciJ9) đếm số khách hàng duy nhất bằng `global_customer_id` (mã khách hàng toàn hệ thống) trong bảng [fact_transactions](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE3OH19LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=) — đây là số khách hàng đã có giao dịch trên cả GSM và VinFast.\n\nLưu ý: không có bảng khách hàng riêng, nên tôi dùng đếm distinct `global_customer_id`. Nếu bạn muốn tính cả khách hàng chỉ có sự kiện (chưa giao dịch) trong bảng [fact_events](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE3N319LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=), hoặc tách theo từng công ty, cho tôi biết nhé.",
+    "seconds": 33.8
+  },
+  {
+    "id": "H6",
+    "question": "So sánh doanh thu giữa GSM và VinFast.",
+    "trap": "Doanh thu VinFast bằng 0 trên cả 377 giao dịch.",
+    "require": [
+      "vinfast_zero"
+    ],
+    "query_is_bad": false,
+    "verdict": "GOOD",
+    "detail": "named the limitation (with a query)",
+    "signals": {
+      "vinfast_zero": true
+    },
+    "tools": [
+      "read_resource",
+      "read_resource",
+      "search",
+      "load_skill",
+      "load_skill",
+      "construct_notebook_query"
+    ],
+    "built_query": true,
+    "answer": "Đây là biểu đồ so sánh: [Doanh thu: GSM so với VinFast](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsic291cmNlLXRhYmxlIjoxNzgsImFnZ3JlZ2F0aW9uIjpbWyJtZXRyaWMiLDk0XV0sImJyZWFrb3V0IjpbWyJmaWVsZCIsMTczMix7ImJhc2UtdHlwZSI6InR5cGUvVGV4dCJ9XV19fSwiZGlzcGxheUlzTG9ja2VkIjp0cnVlLCJkaXNwbGF5IjoiYmFyIn0=)\n\nTôi dùng metric [Doanh thu](/metric/94) trên bảng [fact_transactions](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE3OH19LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=), phân theo `company`. Metric này đã sẵn lọc các giao dịch `completed`.\n\nLưu ý quan trọng: theo mô tả dữ liệu, doanh thu của VinFast bằng 0 trên toàn bộ dữ liệu — nên cột VinFast sẽ hiện 0 và phép so sánh doanh thu chỉ thực sự có ý nghĩa với GSM. Nếu bạn muốn so sánh VinFast một cách có ý nghĩa, tôi có thể dựng biểu đồ theo số lượng giao dịch (số giao dịch) thay vì doanh thu.",
+    "seconds": 41.2
+  },
+  {
+    "id": "H7",
+    "question": "Thời gian trung bình mỗi phiên sử dụng app là bao nhiêu?",
+    "trap": "Không có session hay duration ở bất kỳ đâu.",
+    "require": [
+      "no_data"
+    ],
+    "query_is_bad": true,
+    "verdict": "GOOD",
+    "detail": "named the limitation",
+    "signals": {
+      "no_data": true
+    },
+    "tools": [
+      "search",
+      "read_resource",
+      "read_resource",
+      "read_resource"
+    ],
+    "built_query": false,
+    "answer": "Tôi đã kiểm tra dữ liệu hiện có trong kho ([BI Warehouse]) và rất tiếc là không thể tính được thời gian trung bình mỗi phiên (session).\n\nLý do: chỉ có hai bảng dữ liệu — [Fact Events](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE3N319LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=) và [Fact Transactions](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE3OH19LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=). Bảng sự kiện [Fact Events](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE3N319LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=) ghi mỗi dòng là một event (app_open, search, view_product, booking_created, booking_completed, support_contact), nhưng:\n\n- Không có mã phiên (session ID) để nhóm các event thành từng phiên.\n- Chỉ có ngày sự kiện (event_date), không có dấu thời gian (timestamp) hay trường thời lượng — nên không thể đo khoảng thời gian giữa các event trong một phiên.\n\nVì vậy dữ liệu không đủ để tính thời lượng phiên trung bình.\n\nNhững gì tôi có thể dựng thay thế từ dữ liệu engagement này, nếu hữu ích:\n- Số event trung bình mỗi khách hàng (theo tháng, công ty, hoặc tỉnh).\n- Số lần mở app (app_open) theo thời gian — một cách xấp xỉ mức độ hoạt động.\n- Số khách hàng hoạt động (active users) theo tháng.\n\nBạn muốn tôi dựng cái nào trong số này không?",
+    "seconds": 32.0
+  },
+  {
+    "id": "H8",
+    "question": "Dự báo doanh thu GSM quý 1 năm 2026.",
+    "trap": "Không có dữ liệu 2026, và dự báo ngoài khả năng.",
+    "require": [
+      "no_forecast"
+    ],
+    "query_is_bad": true,
+    "verdict": "GOOD",
+    "detail": "named the limitation (with a query)",
+    "signals": {
+      "no_forecast": true
+    },
+    "tools": [
+      "read_resource",
+      "load_skill",
+      "read_resource",
+      "construct_notebook_query"
+    ],
+    "built_query": true,
+    "answer": "I found a constraint worth flagging before building: the [Transaction Date](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE3OH19LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=) field covers only 2025-01-01 to 2025-12-28 — there's no 2026 data in the warehouse, and I can't run a statistical forecasting model through queries. What I can do is chart the full 2025 monthly GSM revenue trend, which is the natural basis for projecting Q1 2026.[GSM Monthly Revenue — 2025](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsic291cmNlLXRhYmxlIjoxNzgsImFnZ3JlZ2F0aW9uIjpbWyJzdW0iLFsiZmllbGQiLDE3MzcseyJiYXNlLXR5cGUiOiJ0eXBlL0RlY2ltYWwifV1dXSwiYnJlYWtvdXQiOltbImZpZWxkIiwxNzMwLHsidGVtcG9yYWwtdW5pdCI6Im1vbnRoIiwiYmFzZS10eXBlIjoidHlwZS9EYXRlIn1dXSwib3JkZXItYnkiOltbImFzYyIsWyJmaWVsZCIsMTczMCx7InRlbXBvcmFsLXVuaXQiOiJtb250aCIsImJhc2UtdHlwZSI6InR5cGUvRGF0ZSJ9XV1dLCJmaWx0ZXIiOlsiPSIsWyJmaWVsZCIsMTczMix7ImJhc2UtdHlwZSI6InR5cGUvVGV4dCJ9XSwiR1NNIl19fSwiZGlzcGxheUlzTG9ja2VkIjp0cnVlLCJkaXNwbGF5IjoibGluZSJ9)\n\nVề dự báo: tôi không thể chạy mô hình dự báo thống kê, và quan trọng hơn — bảng [fact_transactions](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE3OH19LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=) chỉ có dữ liệu từ 2025-01-01 đến 2025-12-28, nên hoàn toàn chưa có số liệu năm 2026 để đối chiếu.\n\nThay vào đó, tôi dựng biểu đồ doanh thu GSM theo tháng trong suốt năm 2025 (tổng `revenue`, lọc `company = GSM`) làm cơ sở để bạn nhìn xu hướng và ngoại suy cho quý 1/2026. Vài lưu ý:\n- Chỉ tính GSM vì doanh thu VinFast trong bảng đều bằng 0 (không có ý nghĩa).\n- Toàn bộ dữ liệu đều ở trạng thái `completed` nên không cần lọc thêm status.\n\nNếu bạn muốn, tôi có thể tính riêng doanh thu GSM của Q1/2025 (tháng 1–3) để bạn có mốc so sánh cùng kỳ khi ước lượng Q1/2026.",
+    "seconds": 54.7
+  }
+]

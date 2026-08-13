@@ -28,12 +28,13 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import csv
+import io
 import json
 import sys
 from pathlib import Path
 
 import psycopg2
-from psycopg2.extras import execute_values
 
 from load_warehouse import (  # reuse the same connection settings and .env handling
     READER_USER,
@@ -125,6 +126,56 @@ def views_sql(schema):
     """
 
 
+class _RowStream(io.RawIOBase):
+    """Feed COPY from a generator so the CSV is never materialised in memory."""
+
+    def __init__(self, rows, columns):
+        self._chunks = self._encode(rows, columns)
+        self._buf = b""
+
+    @staticmethod
+    def _encode(rows, columns):
+        out = io.StringIO()
+        writer = csv.writer(out, lineterminator="\n")
+        for r in rows:
+            writer.writerow([None if r.get(c, "") == "" else r.get(c) for c in columns])
+            yield out.getvalue().encode("utf-8")
+            out.seek(0)
+            out.truncate(0)
+
+    def readable(self):
+        return True
+
+    def readinto(self, target):
+        while len(self._buf) < len(target):
+            try:
+                self._buf += next(self._chunks)
+            except StopIteration:
+                break
+        take = min(len(target), len(self._buf))
+        target[:take] = self._buf[:take]
+        self._buf = self._buf[take:]
+        return take
+
+
+def copy_rows(cursor, schema, table, columns, rows):
+    """COPY, not INSERT.
+
+    execute_values on 244,800 feature rows took over seven minutes per scenario
+    across the Tailscale tunnel -- roughly an hour for the eight. Each batch is a
+    round trip, and the tunnel's latency dominates. COPY is a single stream.
+
+    An empty CSV cell means NULL, not empty string: NUMERIC and DATE columns
+    reject '' outright. csv.writer emits nothing for None, and FORMAT csv reads
+    an unquoted empty field as NULL, so the two conventions line up.
+    """
+    quoted = ", ".join(f'"{c}"' for c in columns)
+    cursor.copy_expert(
+        f"COPY {schema}.{table} ({quoted}) FROM STDIN WITH (FORMAT csv)",
+        io.BufferedReader(_RowStream(rows, columns), buffer_size=1 << 20),
+    )
+
+
 def scenario_names():
     if not SCENARIO_DIR.exists():
         sys.exit(f"no scenarios at {SCENARIO_DIR} -- run gen_scenario_data.py first")
@@ -157,14 +208,7 @@ def load_one(cursor, conn, name):
 
         wanted = [c.split()[0] for c in
                   (line.strip() for line in ddl.strip().splitlines()) if c]
-        quoted = ", ".join(f'"{c}"' for c in wanted)
-        values = [tuple(None if r.get(c, "") == "" else r.get(c) for c in wanted)
-                  for r in rows]
-        execute_values(
-            cursor,
-            f"INSERT INTO {schema}.{table} ({quoted}) VALUES %s ON CONFLICT DO NOTHING",
-            values, page_size=2000,
-        )
+        copy_rows(cursor, schema, table, wanted, rows)
         total += len(rows)
         print(f"    {table:24s} {len(rows):>7,d} rows")
 

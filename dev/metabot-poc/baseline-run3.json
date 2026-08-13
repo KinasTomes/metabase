@@ -1,0 +1,1143 @@
+[
+  {
+    "n": 1,
+    "question": "Doanh thu completed của GSM trong toàn bộ dữ liệu là bao nhiêu?",
+    "tools": [
+      "read_resource",
+      "read_resource",
+      "load_skill",
+      "construct_notebook_query",
+      "construct_notebook_query",
+      "read_resource",
+      "analyze_chart"
+    ],
+    "answer": "Tôi đã tạo truy vấn tính **tổng doanh thu (sum of revenue)** từ bảng `fact_transactions`, lọc theo `company = 'GSM'` và `status = 'completed'` trên toàn bộ dữ liệu. Kết quả dạng số được hiển thị trực tiếp trong biểu dưới đây:\n\n[Tổng doanh thu completed của GSM](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsiYWdncmVnYXRpb24iOltbInN1bSIsWyJmaWVsZCIsMTczNyx7ImJhc2UtdHlwZSI6InR5cGUvRGVjaW1hbCJ9XV1dLCJzb3VyY2UtdGFibGUiOjE3OCwiZmlsdGVyIjpbImFuZCIsWyI9IixbImZpZWxkIiwxNzMyLHsiYmFzZS10eXBlIjoidHlwZS9UZXh0In1dLCJHU00iXSxbIj0iLFsiZmllbGQiLDE3MzYseyJiYXNlLXR5cGUiOiJ0eXBlL1RleHQifV0sImNvbXBsZXRlZCJdXX19LCJkaXNwbGF5SXNMb2NrZWQiOnRydWUsImRpc3BsYXkiOiJzY2FsYXIifQ==)\n\nLưu ý: theo mô tả dữ liệu, toàn bộ các dòng trong `fact_transactions` vốn đã ở trạng thái `completed`, nên điều kiện này không làm thay đổi kết quả — đây chính là tổng doanh thu của GSM trong toàn bộ giai đoạn dữ liệu (01/01–28/12/2025).",
+    "errors": [],
+    "query": {
+      "lib/type": "mbql/query",
+      "stages": [
+        {
+          "aggregation": [
+            [
+              "sum",
+              {
+                "lib/uuid": "1b058f0b-8ca5-4de2-87f3-d977b65fca64"
+              },
+              [
+                "field",
+                {
+                  "lib/uuid": "a974fdb9-f5e1-431c-bd26-fde7073131a3",
+                  "base-type": "type/Decimal",
+                  "effective-type": "type/Decimal"
+                },
+                1737
+              ]
+            ]
+          ],
+          "filters": [
+            [
+              "and",
+              {
+                "lib/uuid": "09088a63-5a36-4188-96a0-aba70d75b6a8"
+              },
+              [
+                "=",
+                {
+                  "lib/uuid": "90080cef-f6e0-4997-9dec-69764aebfbe8"
+                },
+                [
+                  "field",
+                  {
+                    "lib/uuid": "3de539de-0cc9-48c7-866c-ba7ba4d67a72",
+                    "base-type": "type/Text",
+                    "effective-type": "type/Text"
+                  },
+                  1732
+                ],
+                "GSM"
+              ],
+              [
+                "=",
+                {
+                  "lib/uuid": "a66174f9-88ea-4b66-8b00-cc477dc1accc"
+                },
+                [
+                  "field",
+                  {
+                    "lib/uuid": "1f05bb7b-f85f-4c4c-8ae7-b0275f044932",
+                    "base-type": "type/Text",
+                    "effective-type": "type/Text"
+                  },
+                  1736
+                ],
+                "completed"
+              ]
+            ]
+          ],
+          "lib/type": "mbql.stage/mbql",
+          "source-table": 178
+        }
+      ],
+      "database": 1,
+      "lib/metadata": null
+    },
+    "seconds": 51.2,
+    "rows": [
+      [
+        866341052.35
+      ]
+    ],
+    "verdict": "PASS",
+    "detail": "866341052.35"
+  },
+  {
+    "n": 2,
+    "question": "Doanh thu completed của GSM theo tháng trong toàn bộ dữ liệu.",
+    "tools": [
+      "read_resource",
+      "read_resource",
+      "load_skill",
+      "construct_notebook_query",
+      "construct_notebook_query",
+      "construct_notebook_query"
+    ],
+    "answer": "Đây là biểu đồ doanh thu completed của GSM theo tháng:\n\n[Doanh thu completed của GSM theo tháng](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsic291cmNlLXRhYmxlIjoxNzgsImFnZ3JlZ2F0aW9uIjpbWyJzdW0iLFsiZmllbGQiLDE3MzcseyJiYXNlLXR5cGUiOiJ0eXBlL0RlY2ltYWwifV1dXSwiYnJlYWtvdXQiOltbImZpZWxkIiwxNzMwLHsidGVtcG9yYWwtdW5pdCI6Im1vbnRoIiwiYmFzZS10eXBlIjoidHlwZS9EYXRlIn1dXSwiZmlsdGVyIjpbImFuZCIsWyI9IixbImZpZWxkIiwxNzMyLHsiYmFzZS10eXBlIjoidHlwZS9UZXh0In1dLCJHU00iXSxbIj0iLFsiZmllbGQiLDE3MzYseyJiYXNlLXR5cGUiOiJ0eXBlL1RleHQifV0sImNvbXBsZXRlZCJdXX19LCJkaXNwbGF5SXNMb2NrZWQiOnRydWUsImRpc3BsYXkiOiJsaW5lIn0=)\n\n**Chi tiết truy vấn:**\n- Nguồn: bảng `fact_transactions` (BI Warehouse)\n- Tổng doanh thu (`revenue`, VND) các giao dịch có `status = 'completed'` và `company = 'GSM'`, nhóm theo tháng của `transaction_date`\n- Toàn bộ dữ liệu trong bảng (01/2025 – 28/12/2025), không lọc thêm khoảng thời gian\n\nLưu ý: theo metadata, toàn bộ dòng trong bộ dữ liệu này đều có trạng thái `completed`, nên bộ lọc status được giữ nguyên nhưng không loại bỏ thêm dòng nào. Nếu bạn muốn lưu biểu đồ vào collection hoặc dashboard, hay tách thêm theo sản phẩm (taxi, bike, food, express), cứ cho mình biết nhé!",
+    "errors": [],
+    "query": {
+      "lib/type": "mbql/query",
+      "stages": [
+        {
+          "lib/type": "mbql.stage/mbql",
+          "source-table": 178,
+          "aggregation": [
+            [
+              "sum",
+              {
+                "lib/uuid": "a1b2c3d4-0001-4000-8000-000000000001"
+              },
+              [
+                "field",
+                {
+                  "lib/uuid": "a1b2c3d4-0002-4000-8000-000000000002",
+                  "base-type": "type/Decimal",
+                  "effective-type": "type/Decimal"
+                },
+                1737
+              ]
+            ]
+          ],
+          "breakout": [
+            [
+              "field",
+              {
+                "temporal-unit": "month",
+                "lib/uuid": "a1b2c3d4-0003-4000-8000-000000000003",
+                "base-type": "type/Date",
+                "effective-type": "type/Date"
+              },
+              1730
+            ]
+          ],
+          "filters": [
+            [
+              "=",
+              {
+                "lib/uuid": "a1b2c3d4-0004-4000-8000-000000000004"
+              },
+              [
+                "field",
+                {
+                  "lib/uuid": "a1b2c3d4-0005-4000-8000-000000000005",
+                  "base-type": "type/Text",
+                  "effective-type": "type/Text"
+                },
+                1732
+              ],
+              "GSM"
+            ],
+            [
+              "=",
+              {
+                "lib/uuid": "a1b2c3d4-0006-4000-8000-000000000006"
+              },
+              [
+                "field",
+                {
+                  "lib/uuid": "a1b2c3d4-0007-4000-8000-000000000007",
+                  "base-type": "type/Text",
+                  "effective-type": "type/Text"
+                },
+                1736
+              ],
+              "completed"
+            ]
+          ]
+        }
+      ],
+      "database": 1,
+      "lib/metadata": null
+    },
+    "seconds": 48.5,
+    "rows": [
+      [
+        "2025-01-01T00:00:00Z",
+        66774708.9
+      ],
+      [
+        "2025-02-01T00:00:00Z",
+        75483632.93
+      ],
+      [
+        "2025-03-01T00:00:00Z",
+        64385485.32
+      ],
+      [
+        "2025-04-01T00:00:00Z",
+        68188872.8
+      ],
+      [
+        "2025-05-01T00:00:00Z",
+        76862281.36
+      ],
+      [
+        "2025-06-01T00:00:00Z",
+        82873312.14
+      ],
+      [
+        "2025-07-01T00:00:00Z",
+        96239839.78
+      ],
+      [
+        "2025-08-01T00:00:00Z",
+        64659370.85
+      ],
+      [
+        "2025-09-01T00:00:00Z",
+        58280960.75
+      ],
+      [
+        "2025-10-01T00:00:00Z",
+        78767244.38
+      ],
+      [
+        "2025-11-01T00:00:00Z",
+        74973414.54
+      ],
+      [
+        "2025-12-01T00:00:00Z",
+        58851928.6
+      ]
+    ],
+    "verdict": "PASS",
+    "detail": "12 groups all matching"
+  },
+  {
+    "n": 3,
+    "question": "Doanh thu completed của GSM theo tỉnh trong toàn bộ dữ liệu.",
+    "tools": [
+      "read_resource",
+      "read_resource",
+      "construct_notebook_query"
+    ],
+    "answer": "Đây là biểu đồ tổng doanh thu các giao dịch **completed** của **GSM** theo từng tỉnh, trên toàn bộ dữ liệu (không giới hạn thời gian), sắp xếp từ cao xuống thấp:\n\n[Doanh thu completed của GSM theo tỉnh](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsic291cmNlLXRhYmxlIjoxNzgsImFnZ3JlZ2F0aW9uIjpbWyJzdW0iLFsiZmllbGQiLDE3MzcseyJiYXNlLXR5cGUiOiJ0eXBlL0RlY2ltYWwifV1dXSwiYnJlYWtvdXQiOltbImZpZWxkIiwxNzM1LHsiYmFzZS10eXBlIjoidHlwZS9UZXh0In1dXSwib3JkZXItYnkiOltbImRlc2MiLFsiYWdncmVnYXRpb24iLDAseyJiYXNlLXR5cGUiOiJ0eXBlL0Zsb2F0In1dXV0sImZpbHRlciI6WyJhbmQiLFsiPSIsWyJmaWVsZCIsMTczMix7ImJhc2UtdHlwZSI6InR5cGUvVGV4dCJ9XSwiR1NNIl0sWyI9IixbImZpZWxkIiwxNzM2LHsiYmFzZS10eXBlIjoidHlwZS9UZXh0In1dLCJjb21wbGV0ZWQiXV19fSwiZGlzcGxheUlzTG9ja2VkIjp0cnVlLCJkaXNwbGF5Ijoicm93In0=)\n\n**Ghi chú:**\n- Dữ liệu giao dịch trong hệ thống bao phủ giai đoạn 01/01/2025 – 28/12/2025, nên \"toàn bộ dữ liệu\" chính là khoảng thời gian này.\n- Theo metadata, mọi giao dịch trong bộ dữ liệu đều có trạng thái `completed`, nên bộ lọc này không loại bỏ thêm dòng nào — nhưng vẫn được giữ để đảm bảo đúng yêu cầu.\n- Doanh thu tính bằng VND (tổng `revenue`).",
+    "errors": [],
+    "query": {
+      "lib/type": "mbql/query",
+      "stages": [
+        {
+          "lib/type": "mbql.stage/mbql",
+          "source-table": 178,
+          "aggregation": [
+            [
+              "sum",
+              {
+                "lib/uuid": "47c12d01-cc18-4d63-8211-582ac1c5986c"
+              },
+              [
+                "field",
+                {
+                  "lib/uuid": "f0945a32-d8b0-4f3e-9561-960775b79758",
+                  "base-type": "type/Decimal",
+                  "effective-type": "type/Decimal"
+                },
+                1737
+              ]
+            ]
+          ],
+          "breakout": [
+            [
+              "field",
+              {
+                "lib/uuid": "036046c4-6343-46e2-a72c-c1ee6c44dc0e",
+                "base-type": "type/Text",
+                "effective-type": "type/Text"
+              },
+              1735
+            ]
+          ],
+          "filters": [
+            [
+              "=",
+              {
+                "lib/uuid": "75973681-14c7-422f-adf6-e69a047c58d2"
+              },
+              [
+                "field",
+                {
+                  "lib/uuid": "856b8949-b52f-4cfb-b41e-9b794940b822",
+                  "base-type": "type/Text",
+                  "effective-type": "type/Text"
+                },
+                1732
+              ],
+              "GSM"
+            ],
+            [
+              "=",
+              {
+                "lib/uuid": "4720d4e1-d4fc-4236-b824-bd95ab2d89ce"
+              },
+              [
+                "field",
+                {
+                  "lib/uuid": "f9320680-2a02-4429-85c6-da25932edf69",
+                  "base-type": "type/Text",
+                  "effective-type": "type/Text"
+                },
+                1736
+              ],
+              "completed"
+            ]
+          ],
+          "order-by": [
+            [
+              "desc",
+              {
+                "lib/uuid": "3819b426-f2cf-4a09-b192-edd44d246504"
+              },
+              [
+                "aggregation",
+                {
+                  "base-type": "type/Float",
+                  "effective-type": "type/Float",
+                  "lib/uuid": "fb4cf031-1aa2-45eb-a654-81594de38cf0"
+                },
+                "47c12d01-cc18-4d63-8211-582ac1c5986c"
+              ]
+            ]
+          ]
+        }
+      ],
+      "database": 1,
+      "lib/metadata": null
+    },
+    "seconds": 21.5,
+    "rows": [
+      [
+        "Hải Phòng",
+        121109777.51
+      ],
+      [
+        "Bình Dương",
+        118078617.09
+      ],
+      [
+        "Đà Nẵng",
+        112299135.96
+      ],
+      [
+        "Cần Thơ",
+        110759950.99
+      ],
+      [
+        "Hà Nội",
+        109254431.47
+      ],
+      [
+        "TP Hồ Chí Minh",
+        106720963.65
+      ],
+      [
+        "Đồng Nai",
+        98866597.6
+      ],
+      [
+        "Quảng Ninh",
+        89251578.08
+      ]
+    ],
+    "verdict": "PASS",
+    "detail": "8 groups all matching"
+  },
+  {
+    "n": 4,
+    "question": "Doanh thu completed của GSM theo sản phẩm trong toàn bộ dữ liệu.",
+    "tools": [
+      "read_resource",
+      "load_skill",
+      "construct_notebook_query"
+    ],
+    "answer": "Mình đã tạo truy vấn và biểu đồ cho bạn. [Xem biểu đồ: Doanh thu completed của GSM theo sản phẩm](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsic291cmNlLXRhYmxlIjoxNzgsImFnZ3JlZ2F0aW9uIjpbWyJzdW0iLFsiZmllbGQiLDE3MzcseyJiYXNlLXR5cGUiOiJ0eXBlL0RlY2ltYWwifV1dXSwiYnJlYWtvdXQiOltbImZpZWxkIiwxNzM0LHsiYmFzZS10eXBlIjoidHlwZS9UZXh0In1dXSwib3JkZXItYnkiOltbImRlc2MiLFsiYWdncmVnYXRpb24iLDAseyJiYXNlLXR5cGUiOiJ0eXBlL0Zsb2F0In1dXV0sImZpbHRlciI6WyJhbmQiLFsiPSIsWyJmaWVsZCIsMTczMix7ImJhc2UtdHlwZSI6InR5cGUvVGV4dCJ9XSwiR1NNIl0sWyI9IixbImZpZWxkIiwxNzM2LHsiYmFzZS10eXBlIjoidHlwZS9UZXh0In1dLCJjb21wbGV0ZWQiXV19fSwiZGlzcGxheUlzTG9ja2VkIjp0cnVlLCJkaXNwbGF5IjoiYmFyIn0=)\n\n**Cách xây dựng:**\n- Nguồn: bảng `analytics.fact_transactions` (BI Warehouse)\n- Bộ lọc: `company = 'GSM'` và `status = 'completed'`\n- Chỉ số: tổng `revenue` (VND)\n- Nhóm theo: `product` (taxi, bike, food, express), sắp xếp doanh thu giảm dần\n\nDữ liệu bao phủ toàn bộ giai đoạn 2025-01-01 đến 2025-12-28. Nếu bạn muốn lưu biểu đồ vào một collection/dashboard hoặc xem thêm xu hướng theo tháng, cứ cho mình biết nhé.",
+    "errors": [],
+    "query": {
+      "lib/type": "mbql/query",
+      "stages": [
+        {
+          "lib/type": "mbql.stage/mbql",
+          "source-table": 178,
+          "filters": [
+            [
+              "=",
+              {
+                "lib/uuid": "b1a2bd4d-0f0e-48a3-ab2f-4f55098c4bb7"
+              },
+              [
+                "field",
+                {
+                  "lib/uuid": "bf4eb64b-263e-43f9-a47d-9e910b78b54b",
+                  "base-type": "type/Text",
+                  "effective-type": "type/Text"
+                },
+                1732
+              ],
+              "GSM"
+            ],
+            [
+              "=",
+              {
+                "lib/uuid": "83281eb4-a3ad-4d87-9763-4715f11338af"
+              },
+              [
+                "field",
+                {
+                  "lib/uuid": "51cff28e-1cd3-47ac-b721-17d0fbd42d1b",
+                  "base-type": "type/Text",
+                  "effective-type": "type/Text"
+                },
+                1736
+              ],
+              "completed"
+            ]
+          ],
+          "aggregation": [
+            [
+              "sum",
+              {
+                "lib/uuid": "5a05deb4-7014-4e6b-b3af-5f8b1fd553c2"
+              },
+              [
+                "field",
+                {
+                  "lib/uuid": "bd52daf0-18cd-4c72-b8c7-205f946848cf",
+                  "base-type": "type/Decimal",
+                  "effective-type": "type/Decimal"
+                },
+                1737
+              ]
+            ]
+          ],
+          "breakout": [
+            [
+              "field",
+              {
+                "lib/uuid": "061dfc6d-aaeb-4cf6-9687-a8390015d886",
+                "base-type": "type/Text",
+                "effective-type": "type/Text"
+              },
+              1734
+            ]
+          ],
+          "order-by": [
+            [
+              "desc",
+              {
+                "lib/uuid": "3a838780-b6e6-41e2-80a9-c0a174b2cc8e"
+              },
+              [
+                "aggregation",
+                {
+                  "base-type": "type/Float",
+                  "effective-type": "type/Float",
+                  "lib/uuid": "607208e5-1539-4e97-a260-6993d33cd64e"
+                },
+                "5a05deb4-7014-4e6b-b3af-5f8b1fd553c2"
+              ]
+            ]
+          ]
+        }
+      ],
+      "database": 1,
+      "lib/metadata": null
+    },
+    "seconds": 22.7,
+    "rows": [
+      [
+        "food",
+        230289239.17
+      ],
+      [
+        "express",
+        224218523.54
+      ],
+      [
+        "bike",
+        212103203.48
+      ],
+      [
+        "taxi",
+        199730086.16
+      ]
+    ],
+    "verdict": "PASS",
+    "detail": "4 groups all matching"
+  },
+  {
+    "n": 5,
+    "question": "Số giao dịch completed của GSM trong toàn bộ dữ liệu là bao nhiêu?",
+    "tools": [
+      "read_resource",
+      "load_skill",
+      "construct_notebook_query"
+    ],
+    "answer": "Tôi đã tạo truy vấn đếm số giao dịch có trạng thái **completed** của **GSM** trên toàn bộ bảng `fact_transactions` (không lọc theo thời gian). Kết quả dạng số tổng được hiển thị trong biểu đồ dưới đây:\n\n[Số giao dịch completed của GSM](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsic291cmNlLXRhYmxlIjoxNzgsImFnZ3JlZ2F0aW9uIjpbWyJjb3VudCJdXSwiZmlsdGVyIjpbImFuZCIsWyI9IixbImZpZWxkIiwxNzMyLHsiYmFzZS10eXBlIjoidHlwZS9UZXh0In1dLCJHU00iXSxbIj0iLFsiZmllbGQiLDE3MzYseyJiYXNlLXR5cGUiOiJ0eXBlL1RleHQifV0sImNvbXBsZXRlZCJdXX19LCJkaXNwbGF5SXNMb2NrZWQiOnRydWUsImRpc3BsYXkiOiJzY2FsYXIifQ==)\n\nBạn mở biểu đồ để xem con số cụ thể nhé. Nếu bạn muốn tách thêm theo tháng, sản phẩm (taxi, bike, food, express) hoặc tỉnh thành, cứ cho tôi biết!",
+    "errors": [],
+    "query": {
+      "lib/type": "mbql/query",
+      "stages": [
+        {
+          "lib/type": "mbql.stage/mbql",
+          "source-table": 178,
+          "aggregation": [
+            [
+              "count",
+              {
+                "lib/uuid": "eca4a7e1-6aa2-41ec-8148-151907f36e81"
+              }
+            ]
+          ],
+          "filters": [
+            [
+              "=",
+              {
+                "lib/uuid": "7d5f1205-0a52-4a99-830d-1644b4c0f58f"
+              },
+              [
+                "field",
+                {
+                  "lib/uuid": "112787a7-c5ea-40b1-a4c1-988d2c402080",
+                  "base-type": "type/Text",
+                  "effective-type": "type/Text"
+                },
+                1732
+              ],
+              "GSM"
+            ],
+            [
+              "=",
+              {
+                "lib/uuid": "8183ee0e-d988-4c6e-bcce-0d3bbb79002c"
+              },
+              [
+                "field",
+                {
+                  "lib/uuid": "7b63952a-6deb-40b6-9dfa-94cb3e80d7b2",
+                  "base-type": "type/Text",
+                  "effective-type": "type/Text"
+                },
+                1736
+              ],
+              "completed"
+            ]
+          ]
+        }
+      ],
+      "database": 1,
+      "lib/metadata": null
+    },
+    "seconds": 20.3,
+    "rows": [
+      [
+        31308
+      ]
+    ],
+    "verdict": "PASS",
+    "detail": "31308"
+  },
+  {
+    "n": 6,
+    "question": "Số giao dịch completed của VinFast trong toàn bộ dữ liệu là bao nhiêu?",
+    "tools": [
+      "read_resource",
+      "read_resource",
+      "load_skill",
+      "construct_notebook_query",
+      "analyze_chart",
+      "read_resource",
+      "read_resource"
+    ],
+    "answer": "Đã xong! Mình đã tạo truy vấn đếm số giao dịch trên bảng `analytics.fact_transactions` với bộ lọc:\n\n- **Company = \"VinFast\"**\n- **Status = \"completed\"**\n\nKết quả là một chỉ số scalar duy nhất hiển thị tổng số giao dịch completed của VinFast trong toàn bộ dữ liệu (dữ liệu bao phủ giai đoạn 2025-01-01 đến 2025-12-28).\n\n👉 [Số giao dịch completed của VinFast](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsic291cmNlLXRhYmxlIjoxNzgsImFnZ3JlZ2F0aW9uIjpbWyJjb3VudCJdXSwiZmlsdGVyIjpbImFuZCIsWyI9IixbImZpZWxkIiwxNzMyLHsiYmFzZS10eXBlIjoidHlwZS9UZXh0In1dLCJWaW5GYXN0Il0sWyI9IixbImZpZWxkIiwxNzM2LHsiYmFzZS10eXBlIjoidHlwZS9UZXh0In1dLCJjb21wbGV0ZWQiXV19fSwiZGlzcGxheUlzTG9ja2VkIjp0cnVlLCJkaXNwbGF5Ijoic2NhbGFyIn0=)\n\nLưu ý: theo metadata, toàn bộ các dòng trong dataset này đều có trạng thái `completed`, nên con số này cũng chính là tổng số giao dịch của VinFast. Nếu bạn muốn tách thêm theo tháng, sản phẩm (vehicle, accessories, service) hoặc tỉnh thành, cứ cho mình biết nhé!",
+    "errors": [],
+    "query": {
+      "lib/type": "mbql/query",
+      "stages": [
+        {
+          "lib/type": "mbql.stage/mbql",
+          "source-table": 178,
+          "aggregation": [
+            [
+              "count",
+              {
+                "lib/uuid": "1611a1ca-e186-4183-8e0a-dbbf5cc7a38b"
+              }
+            ]
+          ],
+          "filters": [
+            [
+              "and",
+              {
+                "lib/uuid": "993474c5-801f-4e96-94fd-8d6525f29d98"
+              },
+              [
+                "=",
+                {
+                  "lib/uuid": "d91ec556-3137-4e06-a0b0-2eb616b619bf"
+                },
+                [
+                  "field",
+                  {
+                    "lib/uuid": "48a41b65-c0ae-4a1e-9541-34aadaaf8fd5",
+                    "base-type": "type/Text",
+                    "effective-type": "type/Text"
+                  },
+                  1732
+                ],
+                "VinFast"
+              ],
+              [
+                "=",
+                {
+                  "lib/uuid": "ca94fce9-41a4-46bd-a8e9-1d848c5d8c7c"
+                },
+                [
+                  "field",
+                  {
+                    "lib/uuid": "750ca92e-8bc0-4bfd-a4fe-23af3cc9d6f3",
+                    "base-type": "type/Text",
+                    "effective-type": "type/Text"
+                  },
+                  1736
+                ],
+                "completed"
+              ]
+            ]
+          ]
+        }
+      ],
+      "database": 1,
+      "lib/metadata": null
+    },
+    "seconds": 47.9,
+    "rows": [
+      [
+        377
+      ]
+    ],
+    "verdict": "PASS",
+    "detail": "377"
+  },
+  {
+    "n": 7,
+    "question": "So sánh số giao dịch completed của GSM và VinFast theo tháng trong toàn bộ dữ liệu.",
+    "tools": [
+      "read_resource",
+      "read_resource",
+      "load_skill",
+      "construct_notebook_query",
+      "analyze_chart"
+    ],
+    "answer": "Đây là biểu đồ so sánh số giao dịch **completed** của GSM và VinFast theo từng tháng trên toàn bộ dữ liệu (2025-01 đến 2025-12):\n\n[Số giao dịch completed của GSM vs VinFast theo tháng](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsic291cmNlLXRhYmxlIjoxNzgsImFnZ3JlZ2F0aW9uIjpbWyJjb3VudCJdXSwiYnJlYWtvdXQiOltbImZpZWxkIiwxNzMxLHsiYmFzZS10eXBlIjoidHlwZS9UZXh0In1dLFsiZmllbGQiLDE3MzIseyJiYXNlLXR5cGUiOiJ0eXBlL1RleHQifV1dLCJvcmRlci1ieSI6W1siYXNjIixbImZpZWxkIiwxNzMxLHsiYmFzZS10eXBlIjoidHlwZS9UZXh0In1dXV0sImZpbHRlciI6WyI9IixbImZpZWxkIiwxNzM2LHsiYmFzZS10eXBlIjoidHlwZS9UZXh0In1dLCJjb21wbGV0ZWQiXX19LCJkaXNwbGF5SXNMb2NrZWQiOnRydWUsImRpc3BsYXkiOiJsaW5lIn0=)\n\n**Cách xây dựng truy vấn:**\n- Nguồn: bảng `analytics.fact_transactions`\n- Lọc: `status = 'completed'` (theo lưu ý, toàn bộ dữ liệu trong bảng này đều là giao dịch completed)\n- Đếm số giao dịch, nhóm theo `transaction_month` và tách riêng theo `company` (GSM / VinFast)\n\nBiểu đồ đường hiển thị 2 series (một cho GSM, một cho VinFast) để dễ so sánh xu hướng giữa hai công ty qua 12 tháng. Nếu bạn muốn đổi sang dạng cột (bar) hoặc xem thêm bảng số liệu chi tiết, cứ cho mình biết nhé!",
+    "errors": [],
+    "query": {
+      "lib/type": "mbql/query",
+      "stages": [
+        {
+          "lib/type": "mbql.stage/mbql",
+          "source-table": 178,
+          "filters": [
+            [
+              "=",
+              {
+                "lib/uuid": "20dd53b8-61d2-4550-8468-f6f2541c29aa"
+              },
+              [
+                "field",
+                {
+                  "lib/uuid": "07ccca56-5730-4078-9932-fd869ed5b320",
+                  "base-type": "type/Text",
+                  "effective-type": "type/Text"
+                },
+                1736
+              ],
+              "completed"
+            ]
+          ],
+          "aggregation": [
+            [
+              "count",
+              {
+                "lib/uuid": "966cb662-275b-4a77-b9ca-f908f40b0d10"
+              }
+            ]
+          ],
+          "breakout": [
+            [
+              "field",
+              {
+                "lib/uuid": "3d9688e3-ff8a-462d-8573-4235568ba640",
+                "base-type": "type/Text",
+                "effective-type": "type/Text"
+              },
+              1731
+            ],
+            [
+              "field",
+              {
+                "lib/uuid": "20e10aa0-db70-444d-b68b-64039c1f735f",
+                "base-type": "type/Text",
+                "effective-type": "type/Text"
+              },
+              1732
+            ]
+          ],
+          "order-by": [
+            [
+              "asc",
+              {
+                "lib/uuid": "4eeeebca-abdf-4478-807d-10aaba39c4ca"
+              },
+              [
+                "field",
+                {
+                  "lib/uuid": "85dfe048-6294-4531-8151-6209c71520c1",
+                  "base-type": "type/Text",
+                  "effective-type": "type/Text"
+                },
+                1731
+              ]
+            ]
+          ]
+        }
+      ],
+      "database": 1,
+      "lib/metadata": null
+    },
+    "seconds": 35.1,
+    "rows": [
+      [
+        "2025-01",
+        "GSM",
+        2789
+      ],
+      [
+        "2025-01",
+        "VinFast",
+        12
+      ],
+      [
+        "2025-02",
+        "GSM",
+        2740
+      ],
+      [
+        "2025-02",
+        "VinFast",
+        31
+      ],
+      [
+        "2025-03",
+        "GSM",
+        2498
+      ],
+      [
+        "2025-03",
+        "VinFast",
+        28
+      ],
+      [
+        "2025-04",
+        "GSM",
+        2791
+      ],
+      [
+        "2025-04",
+        "VinFast",
+        27
+      ],
+      [
+        "2025-05",
+        "GSM",
+        2648
+      ],
+      [
+        "2025-05",
+        "VinFast",
+        36
+      ],
+      [
+        "2025-06",
+        "GSM",
+        2515
+      ],
+      [
+        "2025-06",
+        "VinFast",
+        22
+      ],
+      [
+        "2025-07",
+        "GSM",
+        2335
+      ],
+      [
+        "2025-07",
+        "VinFast",
+        35
+      ],
+      [
+        "2025-08",
+        "GSM",
+        2338
+      ],
+      [
+        "2025-08",
+        "VinFast",
+        29
+      ],
+      [
+        "2025-09",
+        "GSM",
+        2710
+      ],
+      [
+        "2025-09",
+        "VinFast",
+        37
+      ],
+      [
+        "2025-10",
+        "GSM",
+        2696
+      ],
+      [
+        "2025-10",
+        "VinFast",
+        31
+      ],
+      [
+        "2025-11",
+        "GSM",
+        2555
+      ],
+      [
+        "2025-11",
+        "VinFast",
+        38
+      ],
+      [
+        "2025-12",
+        "GSM",
+        2693
+      ],
+      [
+        "2025-12",
+        "VinFast",
+        51
+      ]
+    ],
+    "verdict": "PASS",
+    "detail": "24 rows (12 months x 2 companies)"
+  },
+  {
+    "n": 8,
+    "question": "Số giao dịch completed của GSM theo tỉnh trong toàn bộ dữ liệu.",
+    "tools": [
+      "read_resource",
+      "load_skill",
+      "construct_notebook_query"
+    ],
+    "answer": "Đây là biểu đồ số giao dịch completed của GSM theo tỉnh trên toàn bộ dữ liệu:\n\n[Số giao dịch completed của GSM theo tỉnh](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsic291cmNlLXRhYmxlIjoxNzgsImFnZ3JlZ2F0aW9uIjpbWyJjb3VudCJdXSwiYnJlYWtvdXQiOltbImZpZWxkIiwxNzM1LHsiYmFzZS10eXBlIjoidHlwZS9UZXh0In1dXSwib3JkZXItYnkiOltbImRlc2MiLFsiYWdncmVnYXRpb24iLDAseyJiYXNlLXR5cGUiOiJ0eXBlL0JpZ0ludGVnZXIifV1dXSwiZmlsdGVyIjpbImFuZCIsWyI9IixbImZpZWxkIiwxNzMyLHsiYmFzZS10eXBlIjoidHlwZS9UZXh0In1dLCJHU00iXSxbIj0iLFsiZmllbGQiLDE3MzYseyJiYXNlLXR5cGUiOiJ0eXBlL1RleHQifV0sImNvbXBsZXRlZCJdXX19LCJkaXNwbGF5SXNMb2NrZWQiOnRydWUsImRpc3BsYXkiOiJiYXIifQ==)\n\nTruy vấn đếm số giao dịch từ bảng `fact_transactions` với bộ lọc `company = 'GSM'` và `status = 'completed'`, nhóm theo tỉnh và sắp xếp giảm dần theo số lượng. Nếu bạn muốn lưu biểu đồ này vào bộ sưu tập hoặc dashboard, hãy cho mình biết nhé!",
+    "errors": [],
+    "query": {
+      "lib/type": "mbql/query",
+      "stages": [
+        {
+          "lib/type": "mbql.stage/mbql",
+          "source-table": 178,
+          "aggregation": [
+            [
+              "count",
+              {
+                "lib/uuid": "bff9c9b2-6e2f-49aa-830d-a95ec515b31c"
+              }
+            ]
+          ],
+          "breakout": [
+            [
+              "field",
+              {
+                "lib/uuid": "8132a65a-c92a-48a5-a2f2-4db40bab3320",
+                "base-type": "type/Text",
+                "effective-type": "type/Text"
+              },
+              1735
+            ]
+          ],
+          "filters": [
+            [
+              "=",
+              {
+                "lib/uuid": "0167f6d7-07e6-4ff9-8bb6-43c1caa51364"
+              },
+              [
+                "field",
+                {
+                  "lib/uuid": "719333af-cee5-45fb-86c6-758a30596b6a",
+                  "base-type": "type/Text",
+                  "effective-type": "type/Text"
+                },
+                1732
+              ],
+              "GSM"
+            ],
+            [
+              "=",
+              {
+                "lib/uuid": "b65242aa-282e-42dd-b7e1-95d04b0bbce0"
+              },
+              [
+                "field",
+                {
+                  "lib/uuid": "b4ad9256-ad94-4a69-bdb1-124ff650abd9",
+                  "base-type": "type/Text",
+                  "effective-type": "type/Text"
+                },
+                1736
+              ],
+              "completed"
+            ]
+          ],
+          "order-by": [
+            [
+              "desc",
+              {
+                "lib/uuid": "25a696cc-72c4-419a-832f-13767e570214"
+              },
+              [
+                "aggregation",
+                {
+                  "base-type": "type/BigInteger",
+                  "effective-type": "type/BigInteger",
+                  "lib/uuid": "ba6d3cc1-faaa-4f81-aa0b-244aa4f77797"
+                },
+                "bff9c9b2-6e2f-49aa-830d-a95ec515b31c"
+              ]
+            ]
+          ]
+        }
+      ],
+      "database": 1,
+      "lib/metadata": null
+    },
+    "seconds": 18.4,
+    "rows": [
+      [
+        "Hà Nội",
+        4207
+      ],
+      [
+        "Quảng Ninh",
+        4037
+      ],
+      [
+        "Hải Phòng",
+        4003
+      ],
+      [
+        "Đà Nẵng",
+        4002
+      ],
+      [
+        "Cần Thơ",
+        3933
+      ],
+      [
+        "TP Hồ Chí Minh",
+        3905
+      ],
+      [
+        "Bình Dương",
+        3708
+      ],
+      [
+        "Đồng Nai",
+        3513
+      ]
+    ],
+    "verdict": "PASS",
+    "detail": "8 groups all matching"
+  },
+  {
+    "n": 9,
+    "question": "Số giao dịch completed của VinFast theo sản phẩm trong toàn bộ dữ liệu.",
+    "tools": [
+      "read_resource",
+      "read_resource",
+      "load_skill",
+      "construct_notebook_query"
+    ],
+    "answer": "Đây là biểu đồ số giao dịch completed của VinFast theo sản phẩm trên toàn bộ dữ liệu:\n\n[Số giao dịch completed của VinFast theo sản phẩm](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsic291cmNlLXRhYmxlIjoxNzgsImFnZ3JlZ2F0aW9uIjpbWyJjb3VudCJdXSwiYnJlYWtvdXQiOltbImZpZWxkIiwxNzM0LHsiYmFzZS10eXBlIjoidHlwZS9UZXh0In1dXSwib3JkZXItYnkiOltbImRlc2MiLFsiYWdncmVnYXRpb24iLDAseyJiYXNlLXR5cGUiOiJ0eXBlL0JpZ0ludGVnZXIifV1dXSwiZmlsdGVyIjpbImFuZCIsWyI9IixbImZpZWxkIiwxNzMyLHsiYmFzZS10eXBlIjoidHlwZS9UZXh0In1dLCJWaW5GYXN0Il0sWyI9IixbImZpZWxkIiwxNzM2LHsiYmFzZS10eXBlIjoidHlwZS9UZXh0In1dLCJjb21wbGV0ZWQiXV19fSwiZGlzcGxheUlzTG9ja2VkIjp0cnVlLCJkaXNwbGF5IjoiYmFyIn0=)\n\n**Chi tiết truy vấn:**\n- Nguồn: bảng `analytics.fact_transactions` (BI Warehouse)\n- Bộ lọc: `company = 'VinFast'` và `status = 'completed'`\n- Nhóm theo: `product` (VinFast có các sản phẩm: vehicle, accessories, service), sắp xếp theo số giao dịch giảm dần\n\nLưu ý: theo mô tả dữ liệu, toàn bộ các dòng trong tập dữ liệu này đều có trạng thái 'completed', nên kết quả cũng chính là tổng số giao dịch VinFast theo sản phẩm trong giai đoạn 2025.",
+    "errors": [],
+    "query": {
+      "lib/type": "mbql/query",
+      "stages": [
+        {
+          "lib/type": "mbql.stage/mbql",
+          "source-table": 178,
+          "aggregation": [
+            [
+              "count",
+              {
+                "lib/uuid": "354a181b-40e1-44a8-aab8-93aa980d1ec8"
+              }
+            ]
+          ],
+          "breakout": [
+            [
+              "field",
+              {
+                "lib/uuid": "30130c97-9b42-4ef6-af81-3c3a5e994d1a",
+                "base-type": "type/Text",
+                "effective-type": "type/Text"
+              },
+              1734
+            ]
+          ],
+          "filters": [
+            [
+              "=",
+              {
+                "lib/uuid": "2d35f1e2-b448-4865-b91d-3e7d62fb39fc"
+              },
+              [
+                "field",
+                {
+                  "lib/uuid": "281c9dda-ccde-446f-a89e-659ab9da672c",
+                  "base-type": "type/Text",
+                  "effective-type": "type/Text"
+                },
+                1732
+              ],
+              "VinFast"
+            ],
+            [
+              "=",
+              {
+                "lib/uuid": "90aa15ae-d67e-43f8-b972-dce3a13fe77c"
+              },
+              [
+                "field",
+                {
+                  "lib/uuid": "b299965a-ccae-4bb7-b776-c3e58b9e1c4f",
+                  "base-type": "type/Text",
+                  "effective-type": "type/Text"
+                },
+                1736
+              ],
+              "completed"
+            ]
+          ],
+          "order-by": [
+            [
+              "desc",
+              {
+                "lib/uuid": "394944b1-94ab-4217-b24e-ac0060920c80"
+              },
+              [
+                "aggregation",
+                {
+                  "base-type": "type/BigInteger",
+                  "effective-type": "type/BigInteger",
+                  "lib/uuid": "98c18874-61b7-454b-8250-25104b33ddfd"
+                },
+                "354a181b-40e1-44a8-aab8-93aa980d1ec8"
+              ]
+            ]
+          ]
+        }
+      ],
+      "database": 1,
+      "lib/metadata": null
+    },
+    "seconds": 29.2,
+    "rows": [
+      [
+        "service",
+        128
+      ],
+      [
+        "accessories",
+        127
+      ],
+      [
+        "vehicle",
+        122
+      ]
+    ],
+    "verdict": "PASS",
+    "detail": "3 groups all matching"
+  },
+  {
+    "n": 10,
+    "question": "Số event của GSM trong toàn bộ dữ liệu là bao nhiêu?",
+    "tools": [],
+    "answer": "\n[qoder error 403: {\"code\":\"112\",\"message\":\"{\\\"pricingUrl\\\":\\\"https://qoder.com/pricing?client=qoder\\\"}\"}]",
+    "errors": [],
+    "query": null,
+    "seconds": 213.4,
+    "verdict": "PROVIDER_ERROR",
+    "detail": "qoder error 403: [qoder error 403: {\"code\":\"112\",\"message\":\"{\\\"pricingUrl\\\":\\\"https://qoder.com/pricing?client=qoder\\\"}\"}]"
+  },
+  {
+    "n": 11,
+    "question": "Số event của VinFast theo tháng trong toàn bộ dữ liệu.",
+    "tools": [],
+    "answer": "\n[qoder error 403: {\"code\":\"112\",\"message\":\"{\\\"pricingUrl\\\":\\\"https://qoder.com/pricing?client=qoder\\\"}\"}]",
+    "errors": [],
+    "query": null,
+    "seconds": 213.0,
+    "verdict": "PROVIDER_ERROR",
+    "detail": "qoder error 403: [qoder error 403: {\"code\":\"112\",\"message\":\"{\\\"pricingUrl\\\":\\\"https://qoder.com/pricing?client=qoder\\\"}\"}]"
+  },
+  {
+    "n": 12,
+    "question": "Số event của GSM theo tên sự kiện trong toàn bộ dữ liệu.",
+    "tools": [],
+    "answer": "\n[qoder error 403: {\"code\":\"112\",\"message\":\"{\\\"pricingUrl\\\":\\\"https://qoder.com/pricing?client=qoder\\\"}\"}]",
+    "errors": [],
+    "query": null,
+    "seconds": 213.0,
+    "verdict": "PROVIDER_ERROR",
+    "detail": "qoder error 403: [qoder error 403: {\"code\":\"112\",\"message\":\"{\\\"pricingUrl\\\":\\\"https://qoder.com/pricing?client=qoder\\\"}\"}]"
+  },
+  {
+    "n": 13,
+    "question": "Số event của VinFast theo tỉnh trong toàn bộ dữ liệu.",
+    "tools": [],
+    "answer": "\n[qoder error 403: {\"code\":\"112\",\"message\":\"{\\\"pricingUrl\\\":\\\"https://qoder.com/pricing?client=qoder\\\"}\"}]",
+    "errors": [],
+    "query": null,
+    "seconds": 213.5,
+    "verdict": "PROVIDER_ERROR",
+    "detail": "qoder error 403: [qoder error 403: {\"code\":\"112\",\"message\":\"{\\\"pricingUrl\\\":\\\"https://qoder.com/pricing?client=qoder\\\"}\"}]"
+  }
+]
