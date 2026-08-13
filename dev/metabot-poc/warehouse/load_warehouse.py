@@ -98,6 +98,7 @@ CURATED_VIEWS = [
     "dim_customer",
     "dim_global_customer",
     "fact_customer_features",
+    "dim_feature_catalogue",
 ]
 
 # The Feature Store arrives in two pieces with different formats: the registry

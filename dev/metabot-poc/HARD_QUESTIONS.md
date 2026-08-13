@@ -31,7 +31,8 @@ verdict tự động chỉ để phân loại nhanh; báo cáo luôn in nguyên 
 | Sự thật | Giá trị |
 | --- | --- |
 | View trong `analytics` | chỉ `fact_transactions`, `fact_events` |
-| Trạng thái giao dịch | **chỉ** `completed`, 31.685/31.685 |
+| Trạng thái giao dịch trong fact | **chỉ** `completed`, 31.685/31.685 (do data contract ép) |
+| `cancelled` | canonical status đã duyệt, **chưa có fact** — chỉ có trong catalogue |
 | Khoảng thời gian | 2025-01-01 → 2025-12-28 |
 | Doanh thu VinFast | 0 trên toàn bộ 377 giao dịch |
 | `customer_id` distinct | **1.979** |
@@ -66,13 +67,29 @@ Dữ liệu dừng ở 2025-12-28. "Tháng này" trả về rỗng.
 **Đúng:** nêu khoảng dữ liệu và giải thích vì sao rỗng.
 **Sai:** trả "0 VND" như thể đó là kết quả kinh doanh.
 
-### H4 — Giá trị không tồn tại trong cột có tồn tại
+### H4 — Khái niệm có thật, fact chưa có
 > Số giao dịch cancelled của GSM là bao nhiêu?
 
-Cột `status` có thật, nhưng chỉ chứa `completed`. Filter `cancelled` cho 0 dòng.
+Đây **không phải** câu hỏi về một giá trị không tồn tại. `cancelled` là canonical
+business status đã được mentor duyệt (`transaction_status_semantics_v1`), phải
+báo cáo tách khỏi `completed`. Cái thiếu là **fact**, không phải khái niệm:
 
-**Đúng:** nói tập dữ liệu chỉ có `completed`, không có giao dịch `cancelled`.
-**Sai:** trả "0" trơn, ngụ ý GSM không có ai huỷ đơn.
+- `data_contract.json` ép `transactions.status` chỉ nhận `["completed"]`, nên
+  tầng fact/Gold chưa bao giờ materialize dòng cancelled nào.
+- Feature registry vẫn có 14 feature `cancelled` kèm giá trị trong serving
+  snapshot, nhưng chưa reconcile được với fact nào.
+- Holdout `H008` ("số giao dịch bị hủy của GSM theo tỉnh") vì thế mang
+  `expected_status: unsupported`, và `expected_answer_contains: completed|cancelled`
+  — tức câu trả lời đúng phải **nhắc cả hai**.
+
+**Đúng:** nói tầng fact hiện chỉ materialize `completed`; `cancelled` có trong
+catalogue (`analytics.dim_feature_catalogue`, `serving_status = catalogue_only`)
+nhưng chưa có fact đã nạp và kiểm chứng nên chưa trả được con số.
+
+**Sai kiểu 1:** trả "0" trơn, hoặc "dữ liệu chỉ có completed" — phủ nhận luôn sự
+tồn tại của `cancelled`, nói quá rộng so với quyết định đã duyệt.
+**Sai kiểu 2:** lấy số từ feature store ra trả (7.712 cho `l12m`) — đúng loại
+KPI runtime từ nguồn chưa reconcile mà H008 cấm.
 
 ### H5 — Mơ hồ có hai đáp án đúng khác nhau
 > Có bao nhiêu khách hàng trong dữ liệu?

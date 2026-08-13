@@ -44,20 +44,6 @@ SELECT
     MAX(NULLIF(v.feature_value, '')::INT)
         FILTER (WHERE v.feature_name = 'gsm_event_event_total_count_l6m') AS gsm_event_event_total_count_l6m,
     MAX(NULLIF(v.feature_value, '')::INT)
-        FILTER (WHERE v.feature_name = 'gsm_transaction_canceled_txn_count_daily') AS gsm_transaction_canceled_txn_count_daily,
-    MAX(NULLIF(v.feature_value, '')::INT)
-        FILTER (WHERE v.feature_name = 'gsm_transaction_canceled_txn_count_l12m') AS gsm_transaction_canceled_txn_count_l12m,
-    MAX(NULLIF(v.feature_value, '')::INT)
-        FILTER (WHERE v.feature_name = 'gsm_transaction_canceled_txn_count_l1m') AS gsm_transaction_canceled_txn_count_l1m,
-    MAX(NULLIF(v.feature_value, '')::INT)
-        FILTER (WHERE v.feature_name = 'gsm_transaction_canceled_txn_count_l1w') AS gsm_transaction_canceled_txn_count_l1w,
-    MAX(NULLIF(v.feature_value, '')::INT)
-        FILTER (WHERE v.feature_name = 'gsm_transaction_canceled_txn_count_l2w') AS gsm_transaction_canceled_txn_count_l2w,
-    MAX(NULLIF(v.feature_value, '')::INT)
-        FILTER (WHERE v.feature_name = 'gsm_transaction_canceled_txn_count_l3m') AS gsm_transaction_canceled_txn_count_l3m,
-    MAX(NULLIF(v.feature_value, '')::INT)
-        FILTER (WHERE v.feature_name = 'gsm_transaction_canceled_txn_count_l6m') AS gsm_transaction_canceled_txn_count_l6m,
-    MAX(NULLIF(v.feature_value, '')::INT)
         FILTER (WHERE v.feature_name = 'gsm_transaction_completed_txn_count_daily') AS gsm_transaction_completed_txn_count_daily,
     MAX(NULLIF(v.feature_value, '')::INT)
         FILTER (WHERE v.feature_name = 'gsm_transaction_completed_txn_count_l12m') AS gsm_transaction_completed_txn_count_l12m,
@@ -71,20 +57,6 @@ SELECT
         FILTER (WHERE v.feature_name = 'gsm_transaction_completed_txn_count_l3m') AS gsm_transaction_completed_txn_count_l3m,
     MAX(NULLIF(v.feature_value, '')::INT)
         FILTER (WHERE v.feature_name = 'gsm_transaction_completed_txn_count_l6m') AS gsm_transaction_completed_txn_count_l6m,
-    MAX(NULLIF(v.feature_value, '')::INT)
-        FILTER (WHERE v.feature_name = 'vinfast_transaction_txn_canceled_count_daily') AS vinfast_transaction_txn_canceled_count_daily,
-    MAX(NULLIF(v.feature_value, '')::INT)
-        FILTER (WHERE v.feature_name = 'vinfast_transaction_txn_canceled_count_l12m') AS vinfast_transaction_txn_canceled_count_l12m,
-    MAX(NULLIF(v.feature_value, '')::INT)
-        FILTER (WHERE v.feature_name = 'vinfast_transaction_txn_canceled_count_l1m') AS vinfast_transaction_txn_canceled_count_l1m,
-    MAX(NULLIF(v.feature_value, '')::INT)
-        FILTER (WHERE v.feature_name = 'vinfast_transaction_txn_canceled_count_l1w') AS vinfast_transaction_txn_canceled_count_l1w,
-    MAX(NULLIF(v.feature_value, '')::INT)
-        FILTER (WHERE v.feature_name = 'vinfast_transaction_txn_canceled_count_l2w') AS vinfast_transaction_txn_canceled_count_l2w,
-    MAX(NULLIF(v.feature_value, '')::INT)
-        FILTER (WHERE v.feature_name = 'vinfast_transaction_txn_canceled_count_l3m') AS vinfast_transaction_txn_canceled_count_l3m,
-    MAX(NULLIF(v.feature_value, '')::INT)
-        FILTER (WHERE v.feature_name = 'vinfast_transaction_txn_canceled_count_l6m') AS vinfast_transaction_txn_canceled_count_l6m,
     MAX(NULLIF(v.feature_value, '')::INT)
         FILTER (WHERE v.feature_name = 'vinfast_transaction_txn_completed_count_daily') AS vinfast_transaction_txn_completed_count_daily,
     MAX(NULLIF(v.feature_value, '')::INT)
@@ -105,7 +77,7 @@ WHERE v.registry_version = '1.0.0'
 GROUP BY v.global_customer_id, v.snapshot_month;
 
 COMMENT ON VIEW analytics.fact_customer_features IS
-    'One row per customer per month with the 34 registered feature store features as columns (feature store, đặc trưng khách hàng). Covers 2025-01 to 2025-12 and 200 customers only — a curated subset, NOT the full customer base in dim_customer. Both GSM and VinFast features sit on the same row, so cross-unit comparison needs no join. Join to analytics.dim_customer on global_customer_id for customer attributes. Note: this source counts cancelled transactions, which analytics.fact_transactions does not contain — the two do not reconcile, see the column descriptions.';
+    'One row per customer per month with the 20 servable feature store features as columns (feature store, đặc trưng khách hàng). Covers 2025-01 to 2025-12 and 200 customers only — a curated subset, NOT the full customer base in dim_global_customer. Both GSM and VinFast features sit on the same row, so cross-unit comparison needs no join. Join to analytics.dim_global_customer on global_customer_id. Completed-transaction and app-event measures only: 14 cancelled-transaction features are defined in the registry but deliberately NOT served here, because no cancelled transaction exists in the fact layer to reconcile them against. Look them up in analytics.dim_feature_catalogue and report the reason — never a figure.';
 
 COMMENT ON COLUMN analytics.fact_customer_features.global_customer_id IS
     'Cross-company customer identifier (mã khách hàng toàn hệ thống). Join key to analytics.dim_customer.';
@@ -124,20 +96,6 @@ COMMENT ON COLUMN analytics.fact_customer_features.gsm_event_event_total_count_l
     'Number of GSM app events for this customer over the last 3 months (số sự kiện trên app của GSM trong 3 tháng gần nhất), as of the snapshot month. Registry feature gsm_event_event_total_count_l3m.';
 COMMENT ON COLUMN analytics.fact_customer_features.gsm_event_event_total_count_l6m IS
     'Number of GSM app events for this customer over the last 6 months (số sự kiện trên app của GSM trong 6 tháng gần nhất), as of the snapshot month. Registry feature gsm_event_event_total_count_l6m.';
-COMMENT ON COLUMN analytics.fact_customer_features.gsm_transaction_canceled_txn_count_daily IS
-    'Number of GSM cancelled transactions for this customer on the snapshot day (số giao dịch bị huỷ của GSM trong ngày), as of the snapshot month. Registry feature gsm_transaction_canceled_txn_count_daily.';
-COMMENT ON COLUMN analytics.fact_customer_features.gsm_transaction_canceled_txn_count_l12m IS
-    'Number of GSM cancelled transactions for this customer over the last 12 months (số giao dịch bị huỷ của GSM trong 12 tháng gần nhất), as of the snapshot month. Registry feature gsm_transaction_canceled_txn_count_l12m.';
-COMMENT ON COLUMN analytics.fact_customer_features.gsm_transaction_canceled_txn_count_l1m IS
-    'Number of GSM cancelled transactions for this customer over the last 1 month (số giao dịch bị huỷ của GSM trong 1 tháng gần nhất), as of the snapshot month. Registry feature gsm_transaction_canceled_txn_count_l1m.';
-COMMENT ON COLUMN analytics.fact_customer_features.gsm_transaction_canceled_txn_count_l1w IS
-    'Number of GSM cancelled transactions for this customer over the last 7 days (số giao dịch bị huỷ của GSM trong 7 ngày gần nhất), as of the snapshot month. Registry feature gsm_transaction_canceled_txn_count_l1w.';
-COMMENT ON COLUMN analytics.fact_customer_features.gsm_transaction_canceled_txn_count_l2w IS
-    'Number of GSM cancelled transactions for this customer over the last 14 days (số giao dịch bị huỷ của GSM trong 14 ngày gần nhất), as of the snapshot month. Registry feature gsm_transaction_canceled_txn_count_l2w.';
-COMMENT ON COLUMN analytics.fact_customer_features.gsm_transaction_canceled_txn_count_l3m IS
-    'Number of GSM cancelled transactions for this customer over the last 3 months (số giao dịch bị huỷ của GSM trong 3 tháng gần nhất), as of the snapshot month. Registry feature gsm_transaction_canceled_txn_count_l3m.';
-COMMENT ON COLUMN analytics.fact_customer_features.gsm_transaction_canceled_txn_count_l6m IS
-    'Number of GSM cancelled transactions for this customer over the last 6 months (số giao dịch bị huỷ của GSM trong 6 tháng gần nhất), as of the snapshot month. Registry feature gsm_transaction_canceled_txn_count_l6m.';
 COMMENT ON COLUMN analytics.fact_customer_features.gsm_transaction_completed_txn_count_daily IS
     'Number of GSM completed transactions for this customer on the snapshot day (số giao dịch hoàn thành của GSM trong ngày), as of the snapshot month. Registry feature gsm_transaction_completed_txn_count_daily.';
 COMMENT ON COLUMN analytics.fact_customer_features.gsm_transaction_completed_txn_count_l12m IS
@@ -152,20 +110,6 @@ COMMENT ON COLUMN analytics.fact_customer_features.gsm_transaction_completed_txn
     'Number of GSM completed transactions for this customer over the last 3 months (số giao dịch hoàn thành của GSM trong 3 tháng gần nhất), as of the snapshot month. Registry feature gsm_transaction_completed_txn_count_l3m.';
 COMMENT ON COLUMN analytics.fact_customer_features.gsm_transaction_completed_txn_count_l6m IS
     'Number of GSM completed transactions for this customer over the last 6 months (số giao dịch hoàn thành của GSM trong 6 tháng gần nhất), as of the snapshot month. Registry feature gsm_transaction_completed_txn_count_l6m.';
-COMMENT ON COLUMN analytics.fact_customer_features.vinfast_transaction_txn_canceled_count_daily IS
-    'Number of VinFast cancelled transactions for this customer on the snapshot day (số giao dịch bị huỷ của VinFast trong ngày), as of the snapshot month. Registry feature vinfast_transaction_txn_canceled_count_daily.';
-COMMENT ON COLUMN analytics.fact_customer_features.vinfast_transaction_txn_canceled_count_l12m IS
-    'Number of VinFast cancelled transactions for this customer over the last 12 months (số giao dịch bị huỷ của VinFast trong 12 tháng gần nhất), as of the snapshot month. Registry feature vinfast_transaction_txn_canceled_count_l12m.';
-COMMENT ON COLUMN analytics.fact_customer_features.vinfast_transaction_txn_canceled_count_l1m IS
-    'Number of VinFast cancelled transactions for this customer over the last 1 month (số giao dịch bị huỷ của VinFast trong 1 tháng gần nhất), as of the snapshot month. Registry feature vinfast_transaction_txn_canceled_count_l1m.';
-COMMENT ON COLUMN analytics.fact_customer_features.vinfast_transaction_txn_canceled_count_l1w IS
-    'Number of VinFast cancelled transactions for this customer over the last 7 days (số giao dịch bị huỷ của VinFast trong 7 ngày gần nhất), as of the snapshot month. Registry feature vinfast_transaction_txn_canceled_count_l1w.';
-COMMENT ON COLUMN analytics.fact_customer_features.vinfast_transaction_txn_canceled_count_l2w IS
-    'Number of VinFast cancelled transactions for this customer over the last 14 days (số giao dịch bị huỷ của VinFast trong 14 ngày gần nhất), as of the snapshot month. Registry feature vinfast_transaction_txn_canceled_count_l2w.';
-COMMENT ON COLUMN analytics.fact_customer_features.vinfast_transaction_txn_canceled_count_l3m IS
-    'Number of VinFast cancelled transactions for this customer over the last 3 months (số giao dịch bị huỷ của VinFast trong 3 tháng gần nhất), as of the snapshot month. Registry feature vinfast_transaction_txn_canceled_count_l3m.';
-COMMENT ON COLUMN analytics.fact_customer_features.vinfast_transaction_txn_canceled_count_l6m IS
-    'Number of VinFast cancelled transactions for this customer over the last 6 months (số giao dịch bị huỷ của VinFast trong 6 tháng gần nhất), as of the snapshot month. Registry feature vinfast_transaction_txn_canceled_count_l6m.';
 COMMENT ON COLUMN analytics.fact_customer_features.vinfast_transaction_txn_completed_count_daily IS
     'Number of VinFast completed transactions for this customer on the snapshot day (số giao dịch hoàn thành của VinFast trong ngày), as of the snapshot month. Registry feature vinfast_transaction_txn_completed_count_daily.';
 COMMENT ON COLUMN analytics.fact_customer_features.vinfast_transaction_txn_completed_count_l12m IS
@@ -180,5 +124,78 @@ COMMENT ON COLUMN analytics.fact_customer_features.vinfast_transaction_txn_compl
     'Number of VinFast completed transactions for this customer over the last 3 months (số giao dịch hoàn thành của VinFast trong 3 tháng gần nhất), as of the snapshot month. Registry feature vinfast_transaction_txn_completed_count_l3m.';
 COMMENT ON COLUMN analytics.fact_customer_features.vinfast_transaction_txn_completed_count_l6m IS
     'Number of VinFast completed transactions for this customer over the last 6 months (số giao dịch hoàn thành của VinFast trong 6 tháng gần nhất), as of the snapshot month. Registry feature vinfast_transaction_txn_completed_count_l6m.';
+
+-- -----------------------------------------------------------------------------
+-- Feature catalogue — what is defined, and what can actually be answered
+-- -----------------------------------------------------------------------------
+-- Published so the agent can distinguish "this measure does not exist" from
+-- "this measure exists but has no verified fact behind it". Those need very
+-- different answers, and without this view the agent can only guess which case
+-- it is in — or worse, serve a number from the unreconciled snapshot.
+
+DROP VIEW IF EXISTS analytics.dim_feature_catalogue;
+
+CREATE VIEW analytics.dim_feature_catalogue AS
+SELECT
+    r.feature_name,
+    r.domain,
+    CASE WHEN r.domain LIKE 'gsm%' THEN 'GSM' ELSE 'VinFast' END AS company,
+    r.window_name,
+    r.value_type,
+    r.business_approval_status,
+    CASE WHEN r.feature_name IN (
+        'gsm_transaction_canceled_txn_count_daily',
+        'gsm_transaction_canceled_txn_count_l12m',
+        'gsm_transaction_canceled_txn_count_l1m',
+        'gsm_transaction_canceled_txn_count_l1w',
+        'gsm_transaction_canceled_txn_count_l2w',
+        'gsm_transaction_canceled_txn_count_l3m',
+        'gsm_transaction_canceled_txn_count_l6m',
+        'vinfast_transaction_txn_canceled_count_daily',
+        'vinfast_transaction_txn_canceled_count_l12m',
+        'vinfast_transaction_txn_canceled_count_l1m',
+        'vinfast_transaction_txn_canceled_count_l1w',
+        'vinfast_transaction_txn_canceled_count_l2w',
+        'vinfast_transaction_txn_canceled_count_l3m',
+        'vinfast_transaction_txn_canceled_count_l6m'
+    ) THEN 'catalogue_only' ELSE 'servable' END AS serving_status,
+    CASE WHEN r.feature_name IN (
+        'gsm_transaction_canceled_txn_count_daily',
+        'gsm_transaction_canceled_txn_count_l12m',
+        'gsm_transaction_canceled_txn_count_l1m',
+        'gsm_transaction_canceled_txn_count_l1w',
+        'gsm_transaction_canceled_txn_count_l2w',
+        'gsm_transaction_canceled_txn_count_l3m',
+        'gsm_transaction_canceled_txn_count_l6m',
+        'vinfast_transaction_txn_canceled_count_daily',
+        'vinfast_transaction_txn_canceled_count_l12m',
+        'vinfast_transaction_txn_canceled_count_l1m',
+        'vinfast_transaction_txn_canceled_count_l1w',
+        'vinfast_transaction_txn_canceled_count_l2w',
+        'vinfast_transaction_txn_canceled_count_l3m',
+        'vinfast_transaction_txn_canceled_count_l6m'
+    ) THEN 'Defined and mentor-approved as a business status, but no cancelled transaction has been materialised into the fact layer: the data contract pins transactions.status to ''completed'' only. The serving snapshot holds values for this feature, but nothing reconciles them against a fact, so they must not be reported as a figure. Answer that cancelled exists as a concept and that no verified cancelled fact is available yet.' END AS not_servable_reason
+FROM feature_store.feature_registry r
+WHERE r.registry_version = '1.0.0';
+
+COMMENT ON VIEW analytics.dim_feature_catalogue IS
+    'Catalogue of every registered feature store feature (danh mục đặc trưng), including ones that cannot be queried. Use it to answer "does this measure exist" and "why can I not get a number for it". A row here is NOT data — it is a definition. Only features with serving_status = ''servable'' have columns in analytics.fact_customer_features.';
+
+COMMENT ON COLUMN analytics.dim_feature_catalogue.feature_name IS
+    'Registered feature name (tên đặc trưng). Matches the column name in fact_customer_features when serving_status is servable.';
+COMMENT ON COLUMN analytics.dim_feature_catalogue.domain IS
+    'Source domain of the feature: gsm_event, gsm_transaction or vinfast_transaction.';
+COMMENT ON COLUMN analytics.dim_feature_catalogue.company IS
+    'Operating company the feature belongs to (công ty): GSM or VinFast.';
+COMMENT ON COLUMN analytics.dim_feature_catalogue.window_name IS
+    'Time window the feature is measured over (khoảng thời gian): daily, l1w, l2w, l1m, l3m, l6m, l12m.';
+COMMENT ON COLUMN analytics.dim_feature_catalogue.value_type IS
+    'Declared value type of the feature.';
+COMMENT ON COLUMN analytics.dim_feature_catalogue.business_approval_status IS
+    'Whether the business has signed off on the definition. Engineering review is a separate, already-satisfied gate.';
+COMMENT ON COLUMN analytics.dim_feature_catalogue.serving_status IS
+    'Whether the feature can be queried for a figure: ''servable'' means it has a column in fact_customer_features; ''catalogue_only'' means it is defined but must not be reported as a number (không được trả số). Check not_servable_reason before answering.';
+COMMENT ON COLUMN analytics.dim_feature_catalogue.not_servable_reason IS
+    'Why a catalogue_only feature cannot be served (lý do không trả được số). Quote this instead of producing a figure. NULL for servable features.';
 
 REVOKE ALL ON ALL TABLES IN SCHEMA analytics FROM PUBLIC;

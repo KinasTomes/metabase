@@ -70,6 +70,7 @@ EXPECTED_TABLES = {
     "dim_customer": 4000,
     "dim_global_customer": 2600,
     "fact_customer_features": 2400,
+    "dim_feature_catalogue": 34,
 }
 
 # Declared join paths, as (table, column) -> (target table, target column).

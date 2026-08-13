@@ -7,14 +7,37 @@ knowing that the literal string 'gsm_transaction_completed_txn_count_l3m'
 exists, and getting it exactly right. Everything that has worked in this POC has
 worked because the model could see a column name and its description.
 
-So the analytics surface is a pivot: 34 EAV feature names become 34 integer
-columns, and each one gets a COMMENT ON built from its registry entry. The
-registry already carries domain, window and value type, so the descriptions are
-derived rather than invented, and they cannot drift from the governed metadata.
+So the analytics surface is a pivot, and each column gets a COMMENT ON built
+from its registry entry. The registry already carries domain, window and value
+type, so the descriptions are derived rather than invented, and they cannot
+drift from the governed metadata.
+
+Two surfaces, not one
+---------------------
+The registry is a catalogue of what has been *defined*; it is not evidence that
+a measure can be *answered*. Those come apart for cancelled transactions:
+
+* transaction_status_semantics_v1 (mentor-approved) makes `cancelled` a real
+  business status, reported separately from `completed`.
+* data_contract.json pins transactions.status to ["completed"], so no cancelled
+  row was ever materialised into the fact layer, and nothing downstream
+  reconciles against one.
+* Holdout question H008, "cancelled GSM transactions by province", is marked
+  `unsupported` for exactly that reason.
+
+The registry still carries 14 cancelled features with values in serving. Pivot
+them into a queryable column and the agent will answer H008 with a confident
+number sourced from an unreconciled snapshot — the failure the review was
+written to prevent, arriving through the semantic layer rather than the prompt.
+
+So the split is structural: cancelled features are withheld from the fact view
+and published in a catalogue view instead, with the reason attached as data. The
+agent can then discover that cancelled exists and say why it cannot be served,
+without either hallucinating a number or denying the concept.
 
 Writing the SQL out to a file rather than executing a generated string keeps the
-DDL reviewable in git — a diff shows exactly which column descriptions changed
-when the registry moves to 1.1.0.
+DDL reviewable in git — a diff shows exactly which features moved between the
+two surfaces when the registry moves to 1.1.0.
 
 Usage:
     python dev/metabot-poc/warehouse/gen_feature_view_sql.py
@@ -43,6 +66,24 @@ WINDOWS = {
     "l6m": ("over the last 6 months", "trong 6 tháng gần nhất"),
     "l12m": ("over the last 12 months", "trong 12 tháng gần nhất"),
 }
+
+
+# Why a feature is defined but cannot answer a question. Keyed by the marker
+# found in the feature name; the text lands in the catalogue view as data, so
+# the model can quote a reason instead of improvising one.
+WITHHELD_REASON = (
+    "Defined and mentor-approved as a business status, but no cancelled "
+    "transaction has been materialised into the fact layer: the data contract "
+    "pins transactions.status to 'completed' only. The serving snapshot holds "
+    "values for this feature, but nothing reconciles them against a fact, so "
+    "they must not be reported as a figure. Answer that cancelled exists as a "
+    "concept and that no verified cancelled fact is available yet."
+)
+
+
+def is_servable(feature_name):
+    """Cancelled features are catalogue-only. See the module docstring."""
+    return "cancel" not in feature_name.lower()
 
 
 def unit_of(domain):
@@ -127,26 +168,80 @@ GROUP BY v.global_customer_id, v.snapshot_month;
 """
 
 VIEW_COMMENT = (
-    "One row per customer per month with the {n} registered feature store "
-    "features as columns (feature store, đặc trưng khách hàng). Covers {months} "
-    "and {customers} customers only — a curated subset, NOT the full customer "
-    "base in dim_customer. Both GSM and VinFast features sit on the same row, so "
-    "cross-unit comparison needs no join. Join to analytics.dim_customer on "
-    "global_customer_id for customer attributes. Note: this source counts "
-    "cancelled transactions, which analytics.fact_transactions does not contain "
-    "— the two do not reconcile, see the column descriptions."
+    "One row per customer per month with the {n} servable feature store features "
+    "as columns (feature store, đặc trưng khách hàng). Covers {months} and "
+    "{customers} customers only — a curated subset, NOT the full customer base in "
+    "dim_global_customer. Both GSM and VinFast features sit on the same row, so "
+    "cross-unit comparison needs no join. Join to analytics.dim_global_customer "
+    "on global_customer_id. Completed-transaction and app-event measures only: "
+    "{withheld} cancelled-transaction features are defined in the registry but "
+    "deliberately NOT served here, because no cancelled transaction exists in the "
+    "fact layer to reconcile them against. Look them up in "
+    "analytics.dim_feature_catalogue and report the reason — never a figure."
 )
+
+CATALOGUE_SQL = """\
+
+-- -----------------------------------------------------------------------------
+-- Feature catalogue — what is defined, and what can actually be answered
+-- -----------------------------------------------------------------------------
+-- Published so the agent can distinguish "this measure does not exist" from
+-- "this measure exists but has no verified fact behind it". Those need very
+-- different answers, and without this view the agent can only guess which case
+-- it is in — or worse, serve a number from the unreconciled snapshot.
+
+DROP VIEW IF EXISTS analytics.dim_feature_catalogue;
+
+CREATE VIEW analytics.dim_feature_catalogue AS
+SELECT
+    r.feature_name,
+    r.domain,
+    CASE WHEN r.domain LIKE 'gsm%' THEN 'GSM' ELSE 'VinFast' END AS company,
+    r.window_name,
+    r.value_type,
+    r.business_approval_status,
+    CASE WHEN r.feature_name IN (
+{withheld_list}
+    ) THEN 'catalogue_only' ELSE 'servable' END AS serving_status,
+    CASE WHEN r.feature_name IN (
+{withheld_list}
+    ) THEN {reason} END AS not_servable_reason
+FROM feature_store.feature_registry r
+WHERE r.registry_version = {version};
+
+COMMENT ON VIEW analytics.dim_feature_catalogue IS
+    'Catalogue of every registered feature store feature (danh mục đặc trưng), including ones that cannot be queried. Use it to answer "does this measure exist" and "why can I not get a number for it". A row here is NOT data — it is a definition. Only features with serving_status = ''servable'' have columns in analytics.fact_customer_features.';
+
+COMMENT ON COLUMN analytics.dim_feature_catalogue.feature_name IS
+    'Registered feature name (tên đặc trưng). Matches the column name in fact_customer_features when serving_status is servable.';
+COMMENT ON COLUMN analytics.dim_feature_catalogue.domain IS
+    'Source domain of the feature: gsm_event, gsm_transaction or vinfast_transaction.';
+COMMENT ON COLUMN analytics.dim_feature_catalogue.company IS
+    'Operating company the feature belongs to (công ty): GSM or VinFast.';
+COMMENT ON COLUMN analytics.dim_feature_catalogue.window_name IS
+    'Time window the feature is measured over (khoảng thời gian): daily, l1w, l2w, l1m, l3m, l6m, l12m.';
+COMMENT ON COLUMN analytics.dim_feature_catalogue.value_type IS
+    'Declared value type of the feature.';
+COMMENT ON COLUMN analytics.dim_feature_catalogue.business_approval_status IS
+    'Whether the business has signed off on the definition. Engineering review is a separate, already-satisfied gate.';
+COMMENT ON COLUMN analytics.dim_feature_catalogue.serving_status IS
+    'Whether the feature can be queried for a figure: ''servable'' means it has a column in fact_customer_features; ''catalogue_only'' means it is defined but must not be reported as a number (không được trả số). Check not_servable_reason before answering.';
+COMMENT ON COLUMN analytics.dim_feature_catalogue.not_servable_reason IS
+    'Why a catalogue_only feature cannot be served (lý do không trả được số). Quote this instead of producing a figure. NULL for servable features.';
+"""
 
 
 def build_sql(registry, months, customers):
     version = registry["contract_version"]
     features = sorted(registry["features"], key=lambda f: f["feature_name"])
+    servable = [f for f in features if is_servable(f["feature_name"])]
+    withheld = [f for f in features if not is_servable(f["feature_name"])]
     vlit = sql_literal(version)
 
     parts = [VIEW_HEADER.format(version=vlit)]
 
     selects = []
-    for f in features:
+    for f in servable:
         name = f["feature_name"]
         selects.append(
             f"    MAX(NULLIF(v.feature_value, '')::INT)\n"
@@ -159,7 +254,10 @@ def build_sql(registry, months, customers):
     parts.append(
         "    "
         + sql_literal(
-            VIEW_COMMENT.format(n=len(features), months=months, customers=customers)
+            VIEW_COMMENT.format(
+                n=len(servable), withheld=len(withheld),
+                months=months, customers=customers,
+            )
         )
         + ";\n\n"
     )
@@ -173,11 +271,20 @@ def build_sql(registry, months, customers):
         "measured as of the end of this month.';\n\n"
     )
 
-    for f in features:
+    for f in servable:
         parts.append(
             f"COMMENT ON COLUMN analytics.fact_customer_features.{f['feature_name']} IS\n"
             f"    {sql_literal(column_comment(f))};\n"
         )
+
+    withheld_list = ",\n".join(
+        f"        {sql_literal(f['feature_name'])}" for f in withheld
+    )
+    parts.append(CATALOGUE_SQL.format(
+        withheld_list=withheld_list,
+        reason=sql_literal(WITHHELD_REASON),
+        version=vlit,
+    ))
 
     parts.append("\nREVOKE ALL ON ALL TABLES IN SCHEMA analytics FROM PUBLIC;\n")
     return "".join(parts)
@@ -210,9 +317,13 @@ def main():
         return 0
 
     OUT_PATH.write_text(sql_text, encoding="utf-8", newline="\n")
+    features = registry["features"]
+    servable = [f for f in features if is_servable(f["feature_name"])]
     print(f"Wrote {OUT_PATH.relative_to(REPO_ROOT)}")
-    print(f"  {len(registry['features'])} feature columns from registry "
-          f"{registry['contract_version']}")
+    print(f"  registry {registry['contract_version']}: {len(features)} features")
+    print(f"  {len(servable)} servable -> columns in fact_customer_features")
+    print(f"  {len(features) - len(servable)} catalogue_only -> "
+          f"dim_feature_catalogue, no column")
     return 0
 
 
