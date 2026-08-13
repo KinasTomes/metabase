@@ -70,6 +70,14 @@ services:
 
       MB_LLM_OPENAI_API_KEY: ${MB_LLM_OPENAI_API_KEY:-}
       MB_LLM_OPENAI_API_BASE_URL: ${MB_LLM_OPENAI_API_BASE_URL:-https://api.openai.com}
+
+      # The openai adapter talks to /v1/responses. Gateways that only implement
+      # the older /v1/chat/completions therefore cannot serve it at all, whatever
+      # model you name. The openrouter adapter speaks chat/completions, so it is
+      # the way in for those gateways -- the name refers to the wire format here,
+      # not to openrouter.ai.
+      MB_LLM_OPENROUTER_API_KEY: ${MB_LLM_OPENROUTER_API_KEY:-}
+      MB_LLM_OPENROUTER_API_BASE_URL: ${MB_LLM_OPENROUTER_API_BASE_URL:-https://openrouter.ai/api}
     depends_on:
       metabot-app-db:
         condition: service_healthy
