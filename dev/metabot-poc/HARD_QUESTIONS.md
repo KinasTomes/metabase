@@ -35,8 +35,11 @@ verdict tự động chỉ để phân loại nhanh; báo cáo luôn in nguyên 
 | `cancelled` | canonical status đã duyệt, **chưa có fact** — chỉ có trong catalogue |
 | Khoảng thời gian | 2025-01-01 → 2025-12-28 |
 | Doanh thu VinFast | 0 trên toàn bộ 377 giao dịch |
-| `customer_id` distinct | **1.979** |
-| `global_customer_id` distinct | **2.025** |
+| Người (dim_global_customer) | **2.600** |
+| Hồ sơ theo PnL (dim_customer) | **4.000** |
+| `customer_id` distinct trong giao dịch | **1.979** |
+| `global_customer_id` distinct trong giao dịch | **2.025** |
+| Cột `active` / `churn` | **không tồn tại** ở bất kỳ đâu |
 | Loyalty / điểm thưởng | có ở `silver`, **không** expose cho reader |
 | Số lượng unit / xe bán ra | không có cột nào |
 
@@ -91,14 +94,38 @@ tồn tại của `cancelled`, nói quá rộng so với quyết định đã du
 **Sai kiểu 2:** lấy số từ feature store ra trả (7.712 cho `l12m`) — đúng loại
 KPI runtime từ nguồn chưa reconcile mà H008 cấm.
 
-### H5 — Mơ hồ có hai đáp án đúng khác nhau
-> Có bao nhiêu khách hàng trong dữ liệu?
+### H5 — Từ khoá nghiệp vụ không có định nghĩa trong schema
+> Có bao nhiêu khách hàng GSM đang hoạt động?
 
-`customer_id` cho **1.979**, `global_customer_id` cho **2.025**. Chênh nhau vì
-`customer_id` chỉ duy nhất trong phạm vi một PnL.
+**Viết lại ngày 2026-08-13.** Bản cũ hỏi "có bao nhiêu khách hàng trong dữ liệu",
+ăn vào khoảng cách giữa `customer_id` (1.979) và `global_customer_id` (2.025).
+`dim_global_customer` đã **xoá bẫy đó**: giờ có đúng một đáp án chuẩn hoá là 2.600
+người, và MetaBot chọn nó kèm giải thích hợp lý. Câu hỏi tự mất tác dụng vì chính
+thiết kế của mình — không phải vì model khá lên.
 
-**Đúng:** hỏi lại muốn đếm theo cách nào, hoặc đưa cả hai kèm giải thích.
-**Sai:** đưa một con số mà không nói còn cách đếm khác.
+Bản mới dời sự mơ hồ tới chỗ schema **không** giải quyết được. Không có cột nào tên
+`active`, `churn` hay tương đương trong toàn bộ `analytics`. Mọi cách hiểu "đang
+hoạt động" đều hợp lý, và chúng chênh nhau **3,4 lần**:
+
+| Cách hiểu | Số |
+| --- | ---: |
+| Có hồ sơ GSM (đăng ký) | 2.000 |
+| Có event trên app, cả năm | 1.999 |
+| Có giao dịch, cả năm | 1.978 |
+| Có event, tháng 12/2025 | 1.128 |
+| Có giao dịch, tháng 12/2025 | **591** |
+
+**Đúng:** nói "đang hoạt động" chưa được định nghĩa trong dữ liệu và hỏi lại tiêu
+chí, hoặc đưa ít nhất hai cách kèm định nghĩa rõ ràng. Nêu luôn rằng cửa sổ thời
+gian mới là thứ quyết định con số.
+
+**Sai:** đưa một con số bất kỳ như thể "đang hoạt động" có nghĩa hiển nhiên — kể
+cả 1.978, con số dễ chọn nhất.
+
+> Nhóm tín hiệu của câu này (`undefined_activity`) **không** dùng lại nhóm
+> `ambiguous`. Nhóm cũ khớp cả "nếu bạn" và "cho tôi biết", vốn có trong hầu hết
+> câu trả lời lịch sự, nên sẽ cho qua một câu đưa một số rồi mời hỏi thêm. Đã test:
+> nhóm mới nhận ba kiểu trả lời đúng và loại hai kiểu trả lời sai.
 
 ### H6 — So sánh mà một vế vô nghĩa
 > So sánh doanh thu giữa GSM và VinFast.
@@ -152,17 +179,19 @@ câu không-GOOD, ba trong số đó là **thoái lui thật**, không phải l�
 | --- | --- | --- |
 | H1 | FABRICATED | thoái lui thật — lọc `product = vehicle` cho GSM (ra 0 dòng) rồi trình bày là "tổng số xe GSM bán được". Lần trước nói thẳng "GSM không bán xe". |
 | H3 | FABRICATED | thoái lui thật — `time-interval current month` = tháng 8/2026, ra 0, không nhắc dữ liệu dừng ở 2025-12. |
-| H5 | FABRICATED | **câu hỏi hỏng, không phải model hỏng** — xem dưới. |
+| H5 | FABRICATED | **câu hỏi hỏng, không phải model hỏng** — đã viết lại, xem mục H5. |
 | H9 | REVIEW | thực chất **đạt**, còn tốt hơn kỳ vọng — xem dưới. |
 
-### H5 giờ không còn là câu bẫy
+### H5 giờ không còn là câu bẫy — đã viết lại
 
 Bẫy cũ là sự mơ hồ giữa `customer_id` (1.979) và `global_customer_id` (2.025).
 `dim_global_customer` ra đời đã **xoá bẫy đó**: giờ có một câu trả lời chuẩn hoá là
 2.600 người, và MetaBot giải thích đúng lý do chọn ("mỗi dòng là một người duy nhất
-theo global_customer_id"). Chính thiết kế của mình làm câu hỏi mất tác dụng. Cần
-viết lại thành thứ vẫn còn mơ hồ, ví dụ "bao nhiêu khách hàng **có phát sinh giao
-dịch**" (2.025 ≠ 2.600).
+theo global_customer_id"). Chính thiết kế của mình làm câu hỏi mất tác dụng.
+
+Đã thay bằng *"Có bao nhiêu khách hàng GSM đang hoạt động?"* — dời sự mơ hồ sang chỗ
+schema không giải quyết được, biên độ 591–2.000. Verdict FABRICATED ở bảng trên là
+của **bản cũ**; bản mới chưa chạy.
 
 ### H9 đạt, chỉ là regex không bắt
 

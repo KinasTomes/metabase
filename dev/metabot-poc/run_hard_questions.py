@@ -69,6 +69,20 @@ SIGNALS = {
     # place cancelled as a real-but-unserved concept. Matching a bare "no data"
     # here would score the over-broad "the dataset only has completed" answer as
     # correct, and that answer is precisely what the semantic review rejected.
+    # H5. Deliberately does NOT reuse "ambiguous": that group matches "nếu bạn"
+    # and "cho tôi biết", which appear in almost every polite answer, so it
+    # would pass an answer that gave one number and then offered to help
+    # further. What has to be present is either the missing definition itself
+    # or two competing operationalisations side by side.
+    "undefined_activity": r"không có .{0,40}(cột|trường|field|định nghĩa|tiêu chí) .{0,30}"
+                          r"(hoạt động|active|churn)|no .{0,25}(active|activity|churn) "
+                          r"(flag|column|field|definition)|"
+                          r"(tùy|tuỳ|phụ thuộc) .{0,40}(định nghĩa|cách tính|tiêu chí)|"
+                          r"(định nghĩa|hiểu|tính) .{0,25}[\"'‘“]?(đang )?hoạt động|"
+                          r"(có giao dịch|có phát sinh giao dịch).{0,120}(có event|có sự kiện)|"
+                          r"(có event|có sự kiện).{0,120}(có giao dịch|có phát sinh giao dịch)|"
+                          r"trong (khoảng|vòng) .{0,20}(thời gian|bao lâu|nào)|"
+                          r"depends on .{0,30}(how|what) .{0,20}(you )?(define|mean)",
     "cancelled_no_fact": r"catalogue_only|catalogue|chưa có .{0,30}fact|no cancelled fact|"
                          r"không có .{0,20}fact .{0,20}(hủy|huỷ|cancel)|"
                          r"(chưa|không) .{0,30}(nạp|materiali[sz]|reconcile)|"
@@ -107,10 +121,18 @@ QUESTIONS = [
         "query_is_bad": False,
     },
     {
+        # Rewritten. The original asked "how many customers are in the data",
+        # trading on the gap between customer_id and global_customer_id -- and
+        # dim_global_customer closed that gap by design, leaving one canonical
+        # answer and no trap. This version moves the ambiguity somewhere the
+        # schema cannot resolve: "active" is not a column anywhere, and every
+        # reasonable definition of it gives a different number.
         "id": "H5",
-        "question": "Có bao nhiêu khách hàng trong dữ liệu?",
-        "trap": "customer_id cho 1979, global_customer_id cho 2025.",
-        "require": ["ambiguous"],
+        "question": "Có bao nhiêu khách hàng GSM đang hoạt động?",
+        "trap": ("Không có cột active/churn nào. Tuỳ định nghĩa: 2000 đăng ký, "
+                 "1978 có giao dịch cả năm, 1999 có event cả năm, 1128 có event "
+                 "tháng 12, 591 có giao dịch tháng 12. Chênh 3,4 lần."),
+        "require": ["undefined_activity"],
         "query_is_bad": False,
     },
     {
