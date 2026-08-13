@@ -124,7 +124,27 @@ Ba tầng, một finding phải qua cả ba:
 
 Ngưỡng chốt sau bước hiệu chuẩn ở mục 4.1, không bịa trước.
 
-### 2.3 "Hằng đêm" trên dữ liệu tĩnh
+### 2.3 Ba luật nữa, do chính bộ fixture đòi
+
+Dựng xong scenario (mục 4) thì lộ ra ba chỗ ba tầng trên không với tới:
+
+**Luật xu hướng.** `food_churn` giảm 4%/tháng, cộng dồn −19%, nhưng bước tháng lớn nhất
+chỉ −9% — nằm gọn trong nhiễu. Bộ dò bước nhảy **không thể** thấy nó, mà đây lại là dạng
+rủi ro kinh doanh thật nhất trong cả bộ. Cần thêm test xu hướng trên chuỗi 6 tháng
+(Mann-Kendall hoặc độ dốc hồi quy). Nhãn `F1` (phải im) và `F2` (phải kêu) trỏ vào đúng
+cùng một hiện tượng — chênh nhau ở chỗ dùng bộ dò nào.
+
+**Luật hạng mục mới.** `province_expansion` cho Khánh Hòa xuất hiện từ 0 → 123 → 340
+giao dịch. Không có baseline thì z-score chia cho 0 hoặc bỏ qua. Hạng mục mới phải là
+một loại finding riêng, không phải một con số lệch.
+
+**Trung bình winsorize cho cột feature.** 8 cột `PROFILED` là số nguyên đuôi nặng,
+**trung vị bằng 2** — trung vị không thể nhúc nhích dù giá trị tăng gấp đôi. Trung bình
+thô thì dải 12 tháng thật là 4,36–12,56, gần gấp ba, cũng vô dụng. Trung bình winsorize
+p95 cho dải 3,45–5,41 (±44%), đủ ổn định để so. Cùng lý do đuôi nặng như doanh thu, nên
+cùng cách xử lý.
+
+### 2.4 "Hằng đêm" trên dữ liệu tĩnh
 
 Dữ liệu dừng ở 2025-12 và không có bản ghi mới. Dùng **đồng hồ mô phỏng**:
 
@@ -180,19 +200,63 @@ biết trước buổi demo.
 
 ### 4.2 Tiêm shock — bài kiểm tra độ nhạy
 
-Fixture với biến động nhân tạo có nhãn, mỗi cái kiểm một điều khác nhau:
+**Đã dựng xong** (`warehouse/gen_scenario_data.py`, `load_scenario.py`). Baseline là 12
+tháng 2025 **thật, giữ nguyên**; sáu tháng 2026-01..06 được resample từ chính các dòng
+thật — nên giữ nguyên phân phối amount, product, province — rồi mới tiêm hiệu ứng.
 
-| Fixture | Tiêm gì | Phải phát hiện |
-| --- | --- | --- |
-| `volume_drop` | −35% giao dịch GSM một tháng | có |
-| `revenue_tail` | 3 giao dịch 5 tỉ | có, **và phân loại đúng là do đuôi** |
-| `province_shift` | dồn 20% giao dịch sang một tỉnh | có |
-| `noise_only` | resample cùng phân phối | **không** |
-| `low_volume` | −50% giao dịch VinFast | **không** (dưới cỡ mẫu) |
+| Scenario | Tiêm gì | Đo được | Phải kêu |
+| --- | --- | --- | :---: |
+| `tet_surge` | Tết 17/02, dồn chuyến trước Tết, rỗng tuần lễ | taxi 670 → **1.053** (dải 557–712) | ✅ |
+| `province_expansion` | mở Khánh Hòa, ramp 3 tháng | 0 → 123 → 340 | ✅ |
+| `corporate_whale` | 4 chuyến express 8–14M | doanh thu **117M** (dải 58–96M) | ✅ |
+| `pipeline_gap` | sự cố ingest event 9 ngày | event **2.621** (dải 3.253–3.437) | ✅ |
+| `feature_store_shift` | đẩy 1 cột feature ×1,9 | wmean **8,96** (dải 3,45–5,41) | ✅ |
+| `corporate_whale` (W2) | *cùng dữ liệu, winsorize p99* | **64M** (dải 42–74M) | ❌ |
+| `corporate_whale` (W3) | *cùng dữ liệu, đếm giao dịch* | 2.677, phẳng | ❌ |
+| `pipeline_gap` (G2) | *cùng dữ liệu, đếm giao dịch* | phẳng | ❌ |
+| `food_churn` | −4%/tháng, cộng dồn −19% | bước lớn nhất −9% | ❌ |
+| `vinfast_push` | chiến dịch ×1,8 | 31 → 56 dòng | ❌ |
+| `null` | resample, không hiệu ứng | — | ❌ |
 
-Hai dòng cuối quan trọng ngang bốn dòng đầu.
+**Sáu dòng ❌ quan trọng ngang năm dòng ✅.** Cặp W1/W2 là cả bài kiểm tra tách đuôi:
+cùng một tháng, doanh thu thô kêu, doanh thu đã cắt đuôi im — finding nào sống ở W1 mà
+chết ở W2 thì bắt buộc phải kể là *"do bốn chuyến lớn"*, không được kể là tăng trưởng.
 
-### 4.3 Kiểm tra độ trung thực số
+Hai chỗ suýt sai khi dựng, ghi lại vì cùng một bài học — **biên độ phải lấy từ phân phối
+thật, không phải bốc**:
+
+- Whale ban đầu để 4–6 **tỉ**, trong khi cả tháng chỉ 72 triệu. Gấp 280 lần tổng tháng
+  thì không kiểm được gì. p99 thật là 479.908 và max lịch sử 8,67M, nên 8–14M mới là
+  "chuyến lớn nhưng có thể xảy ra".
+- Feature shift ban đầu để ×1,35, nằm gọn trong dải nhiễu 44% của chính cột đó.
+
+Và VinFast phải **kẹp** số rút mỗi tháng vào dải thật 12–51: một lần rút Gauss không kẹp
+ra 58, nhân 1,8 thành 3,4 lần — fixture khi đó kiểm cái máy rút số chứ không kiểm hiệu ứng.
+
+### 4.3 Cách ly: dữ liệu bịa không được chạm vào `analytics`
+
+Biến động tiêm vào **không phải fact**. Nếu chúng nằm trong `analytics`, MetaBot sẽ trả
+lời "tháng nào giảm mạnh nhất" bằng một sự kiện chưa từng xảy ra — đúng loại lỗi của 14
+cột `cancelled`, chỉ khác đường vào.
+
+Mỗi scenario nằm ở schema riêng `scenario_<name>`, chặn bằng **hai lớp độc lập**:
+
+1. `schema-filters-type: inclusion` = `analytics` → sync không thấy;
+2. `REVOKE ALL ... FROM metabase_reader` → chặn ở tầng database.
+
+Lớp 2 không thừa: lớp 1 là một ô cấu hình sửa được trong hai cú bấm ở admin UI, lớp 2
+fail closed. Đã kiểm bằng cách kết nối thật bằng role đó:
+
+```
+scenario_null.fact_transactions  -> BLOCKED: permission denied for schema scenario_null
+scenario_null.transactions       -> BLOCKED: permission denied for schema scenario_null
+analytics.fact_transactions      -> 31685
+```
+
+Và ground truth Sprint 2 không suy suyển: `analytics` vẫn đúng 31.685 dòng, nên 16 đáp án
+trong `EXPECTED_RESULTS.md` còn nguyên giá trị, không phải chạy lại bộ nào.
+
+### 4.4 Kiểm tra độ trung thực số
 
 Chạy `narrate.py` 10 lần trên cùng một findings, đếm số lần cổng chặn bắt được số bịa.
 Con số đó nên được báo cáo thẳng trong buổi cuối — nó là bằng chứng định lượng cho luận
@@ -218,8 +282,9 @@ tin nhắn. Không chặn phần còn lại của sprint vì thiếu một cái 
 
 | # | Việc | Ước lượng | Chặn ai |
 | --- | --- | --- | --- |
-| 1 | `scan.py` + backtest 12 tháng, hiệu chuẩn ngưỡng | 1 ngày | tất cả |
-| 2 | Fixture tiêm shock | 0,5 ngày | |
+| ~~0~~ | ~~Fixture tiêm shock có nhãn~~ | **xong** | |
+| 1 | `scan.py`: 3 tầng ở 2.2 + 3 luật ở 2.3, backtest 12 tháng, hiệu chuẩn ngưỡng | 1 ngày | tất cả |
+| 2 | Chạy `scan.py` qua 8 scenario, đối chiếu nhãn | 0,5 ngày | cần bước 1 |
 | 3 | `narrate.py` + `fidelity.py` | 1 ngày | cần findings ổn định |
 | 4 | `publish.py` + service `scheduler` | 0,5 ngày | |
 | 5 | `link_questions.py` | 0,5 ngày | tuỳ chọn, làm sau cùng |
