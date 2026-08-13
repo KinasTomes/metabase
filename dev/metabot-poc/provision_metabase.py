@@ -209,23 +209,39 @@ def ensure_database():
 
 
 def sync_and_wait(db_id, timeout=300):
+    """Sync, then wait for the field lists to stop changing.
+
+    Waiting only for "every table has at least one field" is not enough. Sync
+    populates fields progressively, so that condition can be satisfied by a
+    partial list -- and a newly added column would then skip verify_descriptions
+    entirely, which defeats the point of having a gate. Observed exactly that:
+    a nine-column view reported as 8/8 described.
+
+    So require the same field counts twice in a row before believing them.
+    """
     print("Syncing schema...")
     call("POST", f"/database/{db_id}/sync_schema", {})
 
     deadline = time.time() + timeout
+    previous = None
     while time.time() < deadline:
         tables = call("GET", f"/database/{db_id}/metadata").get("tables", [])
         found = {t["name"]: t for t in tables if t["name"] in EXPECTED_TABLES}
-        if len(found) == len(EXPECTED_TABLES) and all(
+        complete = len(found) == len(EXPECTED_TABLES) and all(
             t.get("fields") for t in found.values()
-        ):
-            for name, t in sorted(found.items()):
-                print(f"  {name}: {len(t['fields'])} fields")
-            return found
+        )
+        if complete:
+            counts = {name: len(t["fields"]) for name, t in found.items()}
+            if counts == previous:
+                for name, t in sorted(found.items()):
+                    print(f"  {name}: {len(t['fields'])} fields")
+                return found
+            previous = counts
         time.sleep(4)
 
     raise ProvisionError(
-        f"Sync did not surface {sorted(EXPECTED_TABLES)} with fields in {timeout}s."
+        f"Sync did not settle on a stable field list for {sorted(EXPECTED_TABLES)} "
+        f"within {timeout}s."
     )
 
 
