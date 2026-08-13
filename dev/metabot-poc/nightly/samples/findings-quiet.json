@@ -1,0 +1,13 @@
+{
+  "as_of": "2026-03",
+  "schema": "analytics",
+  "generated_at": "2026-08-13T00:00:00Z",
+  "narration": null,
+  "findings": [],
+  "suppressed": [
+    {"metric": "revenue_total", "dimension": "company=GSM", "reason": "below_threshold"},
+    {"metric": "transaction_count", "dimension": "company=VinFast", "reason": "sample_size"},
+    {"metric": "transaction_count", "dimension": "product=food", "reason": "below_threshold"},
+    {"metric": "feature_mean:gsm_event_event_total_count_l1w", "reason": "non_distributed"}
+  ]
+}

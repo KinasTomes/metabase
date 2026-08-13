@@ -1,0 +1,31 @@
+{
+  "as_of": "2026-04",
+  "schema": "scenario_corporate_whale",
+  "generated_at": "2026-08-13T00:00:00Z",
+  "narration": {
+    "verified": true,
+    "model": "openrouter/gpt-5.6-luna",
+    "text": "Doanh thu tháng 4 đạt 117,0 triệu đồng, cao hơn mức nền 72,0 triệu của sáu tháng trước. Toàn bộ mức tăng đến từ bốn giao dịch express rất lớn của một khách hàng doanh nghiệp: sau khi cắt 1% giá trị cao nhất, doanh thu còn 64,0 triệu, nằm trong dải bình thường. Số giao dịch giữ nguyên ở 2.677, nên đây không phải dấu hiệu nhu cầu tăng."
+  },
+  "findings": [
+    {
+      "id": "W1",
+      "title": "Doanh thu GSM",
+      "metric": "revenue_total",
+      "dimension": "company=GSM",
+      "direction": "up",
+      "value": 117.0,
+      "baseline_median": 72.0,
+      "unit": "VND_million",
+      "z": 4.2,
+      "kind": "tail_driven",
+      "note": "Bốn giao dịch express 8–14 triệu từ cùng một khách hàng.",
+      "drill_url": "http://localhost:3000/question/42"
+    }
+  ],
+  "suppressed": [
+    {"metric": "revenue_winsorised_p99", "reason": "below_threshold"},
+    {"metric": "transaction_count", "dimension": "company=VinFast", "reason": "sample_size"},
+    {"metric": "feature_mean:gsm_event_event_total_count_daily", "reason": "non_distributed"}
+  ]
+}
