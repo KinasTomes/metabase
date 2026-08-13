@@ -512,6 +512,39 @@ UNITS = {"revenue_total": "VND"}
 # Entry points
 # --------------------------------------------------------------------------
 
+CONTEXT_SERIES = [
+    ("transaction_count", "overall", "Số giao dịch toàn hệ thống"),
+    ("event_count", "overall", "Số sự kiện toàn hệ thống"),
+    ("active_customers", "overall", "Khách hàng hoạt động"),
+    ("revenue_winsorised", "GSM", "Doanh thu GSM sau khi cắt 1% cao nhất"),
+]
+
+
+def build_context(series, as_of):
+    """Series the narration needs even when they are not findings.
+
+    Two of the interpretation rules are claims about a series that did NOT move:
+    "revenue is up but volume held" and "events fell while transactions did
+    not". Without these figures published, the fidelity gate correctly rejects
+    a summary for citing a number the scan never produced -- which is how this
+    gap surfaced. Being unremarkable is not the same as being unavailable.
+    """
+    out = []
+    for metric, dim, title in CONTEXT_SERIES:
+        points = series.get((metric, dim))
+        if not points or as_of not in points:
+            continue
+        prior = sorted(m for m in points if m < as_of)[-BASELINE_MONTHS:]
+        out.append({
+            "metric": metric, "dimension": dim, "title": title,
+            "value": round(points[as_of][0], 2),
+            "baseline_median": (round(statistics.median([points[m][0] for m in prior]), 2)
+                                if prior else None),
+            "unit": UNITS.get(metric, ""),
+        })
+    return out
+
+
 def build_report(series, schema, as_of):
     findings, suppressed = scan_month(series, as_of)
     return {
@@ -524,6 +557,7 @@ def build_report(series, schema, as_of):
                      "z_threshold": Z_THRESHOLD, "min_rows": MIN_ROWS,
                      "baseline_months": BASELINE_MONTHS},
         "narration": None,
+        "context": build_context(series, as_of),
         "findings": findings,
         "suppressed": suppressed,
     }
