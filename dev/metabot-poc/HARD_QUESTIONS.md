@@ -124,6 +124,25 @@ Không có dữ liệu 2026, và dự báo không phải việc của MetaBot.
 **Đúng:** nói chỉ truy vấn được dữ liệu lịch sử, không dự báo.
 **Sai:** ngoại suy từ 2025 rồi trình bày như một con số.
 
+### H9 — Holdout đã review: khái niệm có, fact chưa có
+> Từ ngày 01/04/2025 đến ngày 30/06/2025, số giao dịch bị hủy của GSM theo tỉnh là bao nhiêu?
+
+Nguyên văn `H008` trong `sprint_2_holdout_mentor_review.csv` — `expected_status:
+unsupported`, `critical: true`, `expected_answer_contains: completed|cancelled`.
+
+Câu sắc nhất trong bộ, vì **cả hai cách trả lời hiển nhiên đều sai**:
+
+- "Không có giao dịch hủy" → phủ nhận một status đã được duyệt.
+- Bất kỳ con số nào — kể cả 7.712 mà feature store cấp được — → báo cáo snapshot
+  chưa reconcile như thể là fact.
+
+**Đúng:** tầng fact chỉ materialize `completed` do data contract; `cancelled` có
+trong `analytics.dim_feature_catalogue` với `serving_status = catalogue_only`;
+chưa có fact hủy nào được nạp và kiểm chứng nên chưa trả được số.
+
+Đã chạy tay một lần và đạt: MetaBot tự tìm tới catalogue, trích `catalogue_only`
+và nêu đúng lý do. Nhưng chỉ **một lần** — chưa đủ để kết luận hành vi ổn định.
+
 ## Kết quả lần chạy đầu (model `anthropic/claude-opus-4-8` qua gorouter)
 
 **8/8 xử lý đúng.** Không câu nào bịa số. Vài trích dẫn:

@@ -137,6 +137,57 @@ giải đây là khác biệt có ý nghĩa.
 | Hà Nội | 2.319 |
 | Đồng Nai | 2.121 |
 
+## Câu 14–16 — bắt buộc join
+
+Ba câu này thêm vào sau khi có `dim_customer` / `dim_global_customer`. Câu 1–13
+đều trả lời được từ một bảng duy nhất, nên **không câu nào chứng minh MetaBot
+join được** — mục tiêu chính của Sprint 2. Ở đây cột dùng để nhóm chỉ tồn tại
+trong dimension, nên join là bắt buộc chứ không phải tuỳ chọn.
+
+### 14 — Doanh thu GSM theo VIP / không VIP
+
+`fact_transactions` ⋈ `dim_global_customer` trên `global_customer_id` (FK đã khai).
+
+| is_vip | Doanh thu |
+| --- | ---: |
+| true | **81.523.640,19** |
+| false | **784.817.412,16** |
+
+Tổng hai nhóm = 866.341.052,35, đúng bằng câu 1 — nếu lệch thì join đã fan-out.
+
+### 15 — Doanh thu GSM từ khách dùng cả hai công ty
+
+`fact_transactions` ⋈ `dim_global_customer`, lọc `has_gsm AND has_vinfast`.
+
+**601.336.757,89** (1.400/2.600 khách dùng cả hai).
+
+### 16 — Doanh thu GSM theo giới tính
+
+`fact_transactions` ⋈ `dim_customer` trên **cả** `customer_id` và `pnl`.
+
+| Giới tính | Doanh thu |
+| --- | ---: |
+| other | **302.013.474,46** |
+| female | **291.061.399,00** |
+| male | **273.266.178,89** |
+
+Đây là câu bẫy nặng nhất: `dim_customer` có grain `(customer_id, pnl)` và
+`customer_id` lặp giữa hai PnL, nên **join thiếu `pnl` sẽ nhân đôi mọi con số**.
+Tổng ba nhóm phải bằng 866.341.052,35.
+
+## Vài sự thật của dữ liệu, dễ hiểu nhầm
+
+Phát hiện trong lúc soạn câu 14–16, ghi lại để khỏi dựng nhầm câu hỏi:
+
+- **Tập VIP trùng khít tập feature store** — đúng 200 người, không hơn không kém.
+  Nên "doanh thu từ khách VIP" và "doanh thu từ khách có trong feature store" là
+  **cùng một con số**. Feature store được xây trên đúng nhóm VIP.
+- **Toàn bộ 200 khách feature store đều có VinFast**, nên không có nhóm nào để so
+  bên trong feature store theo `has_vinfast` hay `is_vip`.
+- **Tỉnh giao dịch luôn bằng tỉnh cư trú của khách.** Nhóm doanh thu theo
+  `dim_customer.province` ra y hệt câu 3. Câu hỏi kiểu này *không* kiểm được join,
+  vì bỏ join vẫn ra đúng số.
+
 ## Cách tái tạo
 
 Sau khi warehouse chạy, chạy lại bằng SQL để xác nhận view khớp bảng trên:

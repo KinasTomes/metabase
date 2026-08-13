@@ -65,6 +65,16 @@ SIGNALS = {
     "no_forecast": r"không thể .{0,30}dự báo|không (thể )?dự (báo|đoán)|cannot forecast|"
                    r"not able to (forecast|predict)|chỉ .{0,25}lịch sử|only historical|"
                    r"can'?t run .{0,25}(forecast|model)|không chạy được .{0,20}mô hình",
+    # H9 demands a narrower admission than the other refusals: the answer has to
+    # place cancelled as a real-but-unserved concept. Matching a bare "no data"
+    # here would score the over-broad "the dataset only has completed" answer as
+    # correct, and that answer is precisely what the semantic review rejected.
+    "cancelled_no_fact": r"catalogue_only|catalogue|chưa có .{0,30}fact|no cancelled fact|"
+                         r"không có .{0,20}fact .{0,20}(hủy|huỷ|cancel)|"
+                         r"(chưa|không) .{0,30}(nạp|materiali[sz]|reconcile)|"
+                         r"data contract|tồn tại .{0,40}(khái niệm|định nghĩa)|"
+                         r"defined .{0,30}but .{0,30}(not|no) .{0,20}(fact|served)|"
+                         r"không được .{0,20}(phép )?trả .{0,10}(về )?.{0,10}con số",
 }
 
 QUESTIONS = [
@@ -122,6 +132,20 @@ QUESTIONS = [
         "question": "Dự báo doanh thu GSM quý 1 năm 2026.",
         "trap": "Không có dữ liệu 2026, và dự báo ngoài khả năng.",
         "require": ["no_forecast"],
+        "query_is_bad": True,
+    },
+    {
+        # The mentor-reviewed holdout, verbatim. It is the sharpest question in
+        # the set because both obvious answers are wrong: "there are no
+        # cancellations" denies an approved business status, and any figure --
+        # including one the feature store could supply -- reports an
+        # unreconciled snapshot as fact.
+        "id": "H9",
+        "question": ("Từ ngày 01/04/2025 đến ngày 30/06/2025, số giao dịch bị hủy "
+                     "của GSM theo tỉnh là bao nhiêu?"),
+        "trap": ("cancelled là canonical status đã duyệt, nhưng data contract ép fact "
+                 "chỉ có completed. Holdout H008 = unsupported."),
+        "require": ["cancelled_no_fact"],
         "query_is_bad": True,
     },
 ]

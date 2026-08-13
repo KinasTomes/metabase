@@ -114,6 +114,27 @@ QUESTIONS = [
      {"kind": "grouped", "expected": Q12_COUNTS}),
     (13, "Số event của VinFast theo tỉnh trong toàn bộ dữ liệu.",
      {"kind": "grouped", "expected": Q13_COUNTS}),
+
+    # 14-16 cannot be answered from a single table. Every grouping column here
+    # lives only in a dimension, so a join is mandatory rather than optional --
+    # which is the point, since questions 1-13 never forced one and so proved
+    # nothing about joins.
+    #
+    # A wrong join is louder than a missing one. dim_customer is keyed on
+    # (customer_id, pnl) and customer_id repeats across PnLs, so joining on
+    # customer_id alone doubles every figure; 16 catches that.
+    (14, "Doanh thu completed của GSM theo khách hàng VIP và không VIP.",
+     {"kind": "grouped",
+      "expected": {"true": 81523640.19, "false": 784817412.16},
+      "note": "join fact_transactions -> dim_global_customer on global_customer_id"}),
+    (15, "Doanh thu completed của GSM từ những khách hàng dùng cả GSM và VinFast là bao nhiêu?",
+     {"kind": "scalar", "value": 601336757.89,
+      "note": "join + filter has_gsm and has_vinfast"}),
+    (16, "Doanh thu completed của GSM theo giới tính khách hàng.",
+     {"kind": "grouped",
+      "expected": {"female": 291061399.00, "male": 273266178.89, "other": 302013474.46},
+      "note": "join fact_transactions -> dim_customer on BOTH customer_id and pnl; "
+              "joining on customer_id alone doubles every figure"}),
 ]
 
 
@@ -255,7 +276,12 @@ def grade(rows, spec):
     if len(rows) != len(expected):
         return "WRONG", f"got {len(rows)} groups, expected {len(expected)}"
 
-    actual = {str(r[0]).strip(): r[-1] for r in rows}
+    # Case-folded, because a boolean grouping column comes back as Python True
+    # and str() spells that "True" while the ground truth spells it "true".
+    # Harmless for the province and product labels, which differ in more than
+    # case.
+    expected = {str(k).strip().lower(): v for k, v in expected.items()}
+    actual = {str(r[0]).strip().lower(): r[-1] for r in rows}
     # Month buckets can come back as full dates; keep only the YYYY-MM prefix.
     if all(k.startswith("2025-") for k in expected):
         actual = {k[:7]: v for k, v in actual.items()}

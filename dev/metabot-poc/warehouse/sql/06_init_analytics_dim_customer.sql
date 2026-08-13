@@ -47,7 +47,7 @@ COMMENT ON COLUMN analytics.dim_customer.birth_year IS
 COMMENT ON COLUMN analytics.dim_customer.gender IS
     'Customer gender (giới tính).';
 COMMENT ON COLUMN analytics.dim_customer.province IS
-    'Customer home province (tỉnh thành của khách hàng). Distinct from the province on a transaction, which is where that transaction happened.';
+    'Customer home province (tỉnh thành của khách hàng). Conceptually different from the province on a transaction, which is where that transaction happened — but in this dataset the two always coincide, so grouping revenue by either gives identical figures. Prefer fact_transactions.province, which needs no join.';
 COMMENT ON COLUMN analytics.dim_customer.is_vip IS
     'Whether the customer is flagged VIP (khách hàng VIP).';
 
