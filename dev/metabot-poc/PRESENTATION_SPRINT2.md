@@ -131,6 +131,31 @@ contract, không trả số nào. Chiếu nguyên văn câu trả lời.
 
 **Bài học một câu:** ranh giới governance phải là cấu trúc, không phải văn bản.
 
+## 6b. Nguồn gốc dữ liệu — nói trước khi bị hỏi (2 phút)
+
+Slide này bảo vệ mọi con số còn lại, nên đừng bỏ.
+
+Cả dự án chỉ có **hai file nguồn**: danh mục feature và một workbook thống kê phân
+phối. Toàn bộ giao dịch, sự kiện, khách hàng là **dummy sinh từ hai file đó**.
+
+Điểm cần nói thẳng: phân phối chỉ phủ **163 trong 824** feature. 661 cái còn lại do
+heuristic bịa ra — và ranh giới đó cắt ngang qua tập mình đang phục vụ: **12 trong
+20 cột là heuristic**, gồm toàn bộ mảng event.
+
+Không mô tả nào từng nói điều đó, nên model được tự do trích một con số bịa ra làm
+số liệu kinh doanh. Đã sửa: thêm `distribution_status` vào catalogue và gắn cảnh báo
+vào đúng 12 cột, sinh tự động từ manifest.
+
+Nếu bị hỏi "sao không thêm feature cho phong phú": scope P0 có 540 feature, 147 cái
+có phân phối thật đang nằm ngoài registry — **nhưng không thêm được một cách hợp
+lệ**. Mỗi dòng registry mang `review_decision_hash` băm từ một quyết định review có
+thật, và DDL chặn bằng `CHECK (semantic_status = 'engineering_reviewed')`. Thêm vào
+là đúc hash cho một cuộc review chưa diễn ra. Ràng buộc đó đang làm đúng việc của
+nó; đường mở rộng hợp lệ là một đợt review mới sinh ra registry 1.1.0.
+
+Đây là slide thể hiện rõ nhất thái độ với dữ liệu: **thà ít feature mà truy được
+nguồn, còn hơn nhiều feature mà không ai bảo chứng.**
+
 ## 7. Những cái đã cắn (2 phút) — chọn hai, đừng kể hết
 
 Chọn theo khán giả:

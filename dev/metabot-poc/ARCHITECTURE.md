@@ -167,6 +167,61 @@ Bài học rút ra khi làm phần này: bản đầu tôi *mô tả* mâu thu�
 là xong. **Mô tả cái bẫy không phải là đóng nó lại** — cột vẫn truy vấn được, và
 MetaBot vẫn trả 7.712 nếu bị hỏi.
 
+### 4.4 Nguồn gốc dữ liệu, và vì sao chỉ có 34 feature
+
+Phần này quan trọng khi đọc mọi con số trong POC.
+
+Dữ liệu đầu vào của cả dự án chỉ gồm **hai file**: `features_list_20260719.xlsx`
+(danh mục feature) và `global_txn_v3_20251101.xlsx` (thống kê phân phối, sheet
+`nullrate`). Toàn bộ dữ liệu giao dịch, sự kiện, khách hàng là **dummy sinh ra từ
+hai file đó**, seed `20260722`. Không có bản ghi thật nào.
+
+Hệ quả trực tiếp, đọc từ `dummy_distribution/manifest.json`:
+
+| | Số |
+| --- | ---: |
+| Feature trong scope dự án | 839 → 824 duy nhất |
+| **Có profile phân phối thật** | **163** |
+| Sinh bằng heuristic theo kiểu dữ liệu | 661 |
+
+Phân phối chỉ phủ 163 feature, nên 80% giá trị trong feature snapshot là do một
+heuristic bịa ra. Ranh giới đó **không tôn trọng registry**: trong 20 feature đang
+phục vụ, **12 là heuristic** — gồm toàn bộ 6 feature event và mọi cửa sổ ngắn hơn
+một tháng. Chỉ feature giao dịch với cửa sổ ≥ 1 tháng mới có phân phối thật.
+
+Điều này giải thích một chênh lệch từng làm mình bối rối: `l3m` completed cho 4,355
+từ feature store nhưng 5,419 khi tính từ fact trên **đúng cùng 200 khách**. Không
+phải bug — feature `PROFILED` được lấy mẫu từ phân phối của workbook nguồn, chưa bao
+giờ dẫn xuất từ bảng fact này. Khác nguồn gốc, không phải sai số.
+
+Cách xử lý: thêm `distribution_status` vào catalogue, **trực giao** với
+`serving_status`, và gắn cảnh báo vào mô tả của đúng 12 cột đó — sinh từ manifest
+nên không lệch được.
+
+**Vì sao không rút chúng đi như đã rút `cancelled`.** Hai thứ khác loại. `cancelled`
+là một **lệnh cấm** có căn cứ: quyết định mentor duyệt, data contract, và H008 đánh
+dấu `unsupported`. Heuristic là một **cảnh báo chất lượng**: không luật nào cấm phục
+vụ, và chính đợt engineering review đã cố ý đưa chúng vào kèm giả định ghi rõ. Cấm
+tuyệt đối thì ép bằng cấu trúc; không chắc chắn thì mô tả. Rút chúng đi sẽ xoá sạch
+mảng event và là bê nguyên bài học cũ sang một tình huống khác loại.
+
+**Vì sao đúng 34 feature.** Không phải tập tuỳ tiện. Chúng khớp chính xác ba review
+group trong `metadata/feature_store/reviews/engineering_mvp_v1.json` — GSM
+transaction status counts (14), VinFast transaction status counts (14), GSM event
+total counts (6) — mỗi group có `review_basis` riêng, ký ngày 2026-08-03.
+
+Scope P0 thật ra có **540** feature, trong đó **147 cái có phân phối thật** đang nằm
+ngoài registry, kể cả những đo lường tiền tệ (`completed_original_price_sum`) mà
+feature store hiện hoàn toàn thiếu — nó chỉ có count.
+
+Không thêm được. Mỗi dòng registry mang `review_decision_hash` băm từ một quyết định
+review có thật, và DDL có `CHECK (semantic_status = 'engineering_reviewed')`. Thêm
+147 feature kia nghĩa là **đúc hash cho một cuộc review chưa từng diễn ra**. Ràng
+buộc đó chính là câu trả lời: bảng từ chối, và nó đúng khi từ chối.
+
+Đường mở rộng hợp lệ là một đợt review mới sinh ra registry `1.1.0`. Đó là việc của
+con người, không phải của engineering — và generator ở đây đã sẵn sàng cho nó.
+
 ## 5. Bảo mật và cô lập
 
 Phòng thủ theo lớp, mỗi lớp độc lập:
