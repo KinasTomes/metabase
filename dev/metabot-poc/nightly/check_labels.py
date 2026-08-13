@@ -33,7 +33,12 @@ METRIC_MAP = {
     "transaction_count": ["transaction_count", "transaction_count_by_company",
                           "transaction_count_by_product",
                           "transaction_count_by_province"],
-    "transaction_count_trend": ["transaction_count_trend"],  # not implemented yet
+    # Trend findings are named after the series they came from, so a label
+    # about "transaction_count_trend" has to match by_product/by_province too.
+    "transaction_count_trend": ["transaction_count_trend",
+                                "transaction_count_by_company_trend",
+                                "transaction_count_by_product_trend",
+                                "transaction_count_by_province_trend"],
     "province_mix": ["transaction_count_by_province"],
     "revenue_total": ["revenue_total"],
     "revenue_winsorised_p99": ["revenue_winsorised"],

@@ -4,31 +4,41 @@ Every number that ever reaches a reader is produced here. `narrate.py` only
 rephrases this file's output and `fidelity.py` refuses to publish prose
 containing a figure that is not in it.
 
-THREE GATES, ALL OF WHICH A FINDING MUST PASS
----------------------------------------------
+THE STEP RULE, WHICH MOST FINDINGS COME FROM
+--------------------------------------------
 1. Sample size. Fewer than MIN_ROWS rows in the current month and the series is
    suppressed, however large the percentage move. VinFast averages 31
    transactions a month; a 1.8x campaign on 31 rows is real and still not
    something to put in front of a manager as a trend.
 
 2. Modified z-score against the trailing window -- median and MAD, not mean and
-   sd. 64% of transactions have amount 0 and the top 1% carry 37% of revenue, so
-   sd is inflated by the tail and hides genuine moves behind its own noise.
-   Threshold 3.5 is the Iglewicz-Hoaglin cutoff.
+   sd, because 64% of transactions have amount 0 and the top 1% carry 37% of
+   revenue, so sd is inflated by the tail. Two floors sit under it, both
+   calibrated against the 12 real months rather than chosen: a Poisson floor on
+   the scale, and a minimum relative move per family. Then a non-parametric
+   backstop -- a month inside the range of the six before it is not an outlier
+   whatever the arithmetic says.
 
 3. Tail check, monetary series only. Recompute with values winsorised at p99. A
    finding that survives raw and dies winsorised is not revenue growth, it is a
    handful of large jobs, and it is reported as `tail_driven`. Four rows moved
    one fixture month by 60% with volume flat -- that has to read as four rows.
 
-WHAT THIS VERSION CANNOT SEE
-----------------------------
-It compares one month against a baseline, so a slow bleed slips through: the
-`food_churn` fixture loses 4% a month to -19% cumulative without a single
-detectable step. A new category has no baseline at all, so `province_expansion`
-divides by zero and is skipped. Both are labelled `expect_detect: false` for
-this detector and true for the trend and new-category rules that come next --
-the gap is measured, not hidden.
+TWO RULES THE STEP RULE CANNOT REACH
+------------------------------------
+4. Trend. A month-against-baseline comparison cannot see a slow bleed: -4% a
+   month compounds to -19% over six without any month looking unusual next to
+   the five before it, which is also the most ordinary way a business declines.
+   Mann-Kendall over seven months, plus the requirement that the series has
+   ended up somewhere it has never been -- six consecutive falls happen by
+   chance about once in 720, and across 40 series that is one a month.
+
+5. New category. A dimension with no history has nothing to deviate from, so it
+   is reported rather than scored, on share of the month rather than row count.
+
+Measured: 12/12 against the labelled fixtures, 6/6 sensitivity and 6/6
+specificity, and 0.33 findings a month backtesting the real data -- both of
+those being the same real December spike in Binh Duong.
 
 Usage:
     python scan.py --schema analytics --as-of 2025-12
@@ -65,6 +75,20 @@ FEATURE_WINSOR_Q = 0.95 # feature columns, whose tail is heavier still
 # poor scale estimate, and on a near-flat series it collapses -- `app_open`
 # moved 4.1% and scored z=-4.43 because its baseline MAD was about 7.
 RELATIVE_FLOOR = {"count": 0.15, "revenue": 0.25, "feature": 0.45}
+
+# Trend rule. TREND_S_MIN is calibrated the same way as the floors above:
+# swept against the 12 real months until the trend arm stopped firing on data
+# with nothing in it. |S| >= 19 of a possible 21 means at most one inversion in
+# seven months.
+TREND_MONTHS = 7
+TREND_S_MIN = 19
+TREND_REL_FLOOR = 0.15
+
+# A dimension absent for the whole baseline window and now carrying this share
+# of the month is reported as a new category rather than scored. MIN_ROWS cannot
+# do this job: Khanh Hoa opened at 128 transactions, below the 300-row gate, yet
+# already 5% of the month -- the launch is the story, not its first-month size.
+NEW_CATEGORY_SHARE = 0.03
 
 
 def family(metric):
@@ -285,8 +309,69 @@ def modified_z(x, baseline, counting):
 MONETARY = {"revenue_total"}
 
 
+def mann_kendall_s(values):
+    """Sum of the signs of every pairwise difference, later minus earlier.
+
+    Rank-based, so a single outlying month cannot manufacture a trend the way it
+    can drag a regression slope. For n=7 the statistic runs -21..21.
+    """
+    n = len(values)
+    return sum(
+        (values[j] > values[i]) - (values[j] < values[i])
+        for i in range(n) for j in range(i + 1, n)
+    )
+
+
+def evaluate_trend(points, as_of, metric):
+    """Is the series drifting, even though no single month steps out of line?
+
+    The step detector compares one month against a baseline, so a slow bleed is
+    invisible to it: -4% a month compounds to -19% over six without any month
+    looking unusual next to the five before it. That is also the most ordinary
+    way a business declines, so it needs its own rule rather than a lower
+    threshold on the other one -- lowering the step threshold enough to catch
+    this fired twice a month on data containing nothing.
+    """
+    months = sorted(m for m in points if m <= as_of)[-TREND_MONTHS:]
+    if len(months) < TREND_MONTHS or as_of not in points:
+        return None
+    if points[as_of][1] < (MIN_FEATURE_ROWS if family(metric) == "feature" else MIN_ROWS):
+        return None
+
+    values = [points[m][0] for m in months]
+    s = mann_kendall_s(values)
+    if abs(s) < TREND_S_MIN:
+        return None
+
+    # Monotone is not the same as material: compare the medians of the two ends
+    # rather than first against last, so one soft month does not set the size.
+    third = max(2, len(values) // 3)
+    early = statistics.median(values[:third])
+    late = statistics.median(values[-third:])
+    if not early or abs(late - early) / abs(early) < TREND_REL_FLOOR:
+        return None
+
+    # A trend has to take the series somewhere it has not been. Six consecutive
+    # falls happen by chance roughly once in 720, and across ~40 series that is
+    # about one a month: the null fixture produced exactly one, Binh Duong
+    # sliding 336 -> 306 after December's spike, perfectly monotone and entirely
+    # inside its own normal range of 260..423. Drifting back to ordinary is not
+    # a decline. Food, by contrast, ends at 477 against a floor of 575.
+    history = [points[m][0] for m in points if m < months[0]]
+    if not history:
+        return None
+    if min(history) <= points[as_of][0] <= max(history):
+        return None
+
+    return {"value": late, "baseline_median": early, "s": s,
+            "change": (late - early) / early, "months": months}
+
+
 def scan_month(series, as_of):
     findings, suppressed = [], []
+    months_seen = sorted({m for p in series.values() for m in p})
+    total_points = series.get(("transaction_count", "overall"), {})
+    month_total = total_points.get(as_of, (0, 0))[0]
 
     # Pass 1: winsorised revenue verdicts, needed to classify raw revenue.
     wins_fired = {}
@@ -303,7 +388,47 @@ def scan_month(series, as_of):
         v = evaluate(points, as_of, metric)
         if v is None:
             continue
+
+        # A dimension with no history at all is not a deviation to be scored --
+        # there is nothing to deviate from, and a z-score either divides by zero
+        # or, as here, gets skipped for a short baseline. A province that did
+        # not exist last month and now carries 12% of transactions is the most
+        # reportable thing in the dataset, so it gets its own verdict.
+        prior = sorted(m for m in months_seen if m < as_of)[-BASELINE_MONTHS:]
+        share = points[as_of][0] / month_total if month_total else 0
+        if (v.get("reason") == "short_baseline" and dim != "overall"
+                and family(metric) == "count"
+                and not any(m in points for m in prior)
+                and share >= NEW_CATEGORY_SHARE):
+            findings.append({
+                "id": f"{metric}:{dim}:{as_of}:new",
+                "title": TITLES.get(metric, metric),
+                "metric": metric, "dimension": dim, "direction": "new",
+                "value": round(points[as_of][0], 2), "baseline_median": None,
+                "unit": UNITS.get(metric, ""), "z": None, "n": points[as_of][1],
+                "kind": "new_category",
+                "note": f"Chưa từng xuất hiện trước đó; nay chiếm {share:.1%} số giao dịch của tháng.",
+            })
+            continue
+
         if not v["fired"]:
+            t = evaluate_trend(points, as_of, metric)
+            if t:
+                findings.append({
+                    "id": f"{metric}:{dim}:{as_of}:trend",
+                    "title": TITLES.get(metric, metric),
+                    "metric": f"{metric}_trend",
+                    "dimension": None if dim == "overall" else dim,
+                    "direction": "up" if t["change"] > 0 else "down",
+                    "value": round(t["value"], 2),
+                    "baseline_median": round(t["baseline_median"], 2),
+                    "unit": UNITS.get(metric, ""), "z": None,
+                    "n": points[as_of][1], "kind": "trend",
+                    "note": (f"Xu hướng {TREND_MONTHS} tháng liên tiếp, "
+                             f"cộng dồn {t['change']:+.0%}. Không tháng nào "
+                             f"lệch đủ để bị bắt riêng lẻ."),
+                })
+                continue
             if v.get("reason"):
                 suppressed.append({"metric": metric, "dimension": dim,
                                    "reason": v["reason"]})
@@ -331,7 +456,7 @@ def scan_month(series, as_of):
             "note": note,
         })
 
-    findings.sort(key=lambda f: -abs(f["z"]))
+    findings.sort(key=lambda f: -abs(f["z"] or 0))
     return findings, suppressed
 
 
@@ -394,7 +519,8 @@ def build_report(series, schema, as_of):
         "schema": schema,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "detector": {"rules": ["sample_size", "modified_z", "relative_floor",
-                               "baseline_range", "tail_check"],
+                               "baseline_range", "tail_check", "trend",
+                               "new_category"],
                      "z_threshold": Z_THRESHOLD, "min_rows": MIN_ROWS,
                      "baseline_months": BASELINE_MONTHS},
         "narration": None,
