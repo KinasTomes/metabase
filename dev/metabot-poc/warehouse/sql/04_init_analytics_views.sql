@@ -45,7 +45,7 @@ SELECT
 FROM silver.transactions t;
 
 COMMENT ON VIEW analytics.fact_transactions IS
-    'One row per transaction (giao dịch). Revenue and transaction counts for GSM and VinFast, broken down by month, product, and province. Filter status = ''completed'' for realised business results.';
+    'One row per transaction (giao dịch). Revenue and transaction counts for GSM and VinFast, broken down by month, product, and province. Carries completed transactions only — see the status column before answering anything about cancellations.';
 
 COMMENT ON COLUMN analytics.fact_transactions.transaction_id IS
     'Unique transaction identifier. Count rows to get số giao dịch (transaction count).';
@@ -62,7 +62,7 @@ COMMENT ON COLUMN analytics.fact_transactions.product IS
 COMMENT ON COLUMN analytics.fact_transactions.province IS
     'Vietnamese province where the transaction took place (tỉnh, tỉnh thành).';
 COMMENT ON COLUMN analytics.fact_transactions.status IS
-    'Transaction status (trạng thái). Every row in this dataset is ''completed''.';
+    'Transaction status (trạng thái). Every row here is ''completed'', because the data contract materialises only completed transactions into this fact layer. This does NOT mean cancellations do not happen: ''cancelled'' (giao dịch bị huỷ) is an approved business status, reported separately, but no cancelled fact has been loaded or reconciled yet. For a cancelled question, say the fact layer currently carries completed only and that no verified cancelled figure is available — do not answer 0, and do not take a number from any other source. See analytics.dim_feature_catalogue.';
 COMMENT ON COLUMN analytics.fact_transactions.revenue IS
     'Transaction amount in VND (doanh thu, giá trị giao dịch). Sum for total revenue. Note: VinFast rows are all 0, so VinFast revenue is not meaningful — use transaction counts for VinFast instead.';
 COMMENT ON COLUMN analytics.fact_transactions.customer_id IS
