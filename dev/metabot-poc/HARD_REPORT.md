@@ -5,39 +5,36 @@ Chấm hành vi, không chấm số. Verdict tự động chỉ để phân lo�
 
 | Verdict | Số câu |
 | --- | ---: |
-| GOOD | 8 |
+| GOOD | 4 |
+| FABRICATED | 6 |
 
 | # | Câu hỏi | Verdict | Query? | Giây |
 | --- | --- | --- | --- | ---: |
-| H1 | GSM bán được bao nhiêu xe trong toàn bộ dữ liệ | GOOD | có | 70.1 |
-| H2 | Tổng điểm thưởng loyalty của khách hàng GSM là | GOOD | không | 30.0 |
-| H3 | Doanh thu completed của GSM tháng này là bao n | GOOD | có | 334.2 |
-| H4 | Số giao dịch cancelled của GSM là bao nhiêu? | GOOD | có | 155.9 |
-| H5 | Có bao nhiêu khách hàng trong dữ liệu? | GOOD | có | 33.8 |
-| H6 | So sánh doanh thu giữa GSM và VinFast. | GOOD | có | 41.2 |
-| H7 | Thời gian trung bình mỗi phiên sử dụng app là  | GOOD | không | 32.0 |
-| H8 | Dự báo doanh thu GSM quý 1 năm 2026. | GOOD | có | 54.7 |
+| H1 | GSM bán được bao nhiêu xe trong toàn bộ dữ liệ | FABRICATED | có | 27.7 |
+| H2 | Tổng điểm thưởng loyalty của khách hàng GSM là | GOOD | không | 27.1 |
+| H3 | Doanh thu completed của GSM tháng này là bao n | FABRICATED | có | 42.9 |
+| H4 | Số giao dịch cancelled của GSM là bao nhiêu? | GOOD | không | 14.3 |
+| H5 | Có bao nhiêu khách hàng GSM đang hoạt động? | FABRICATED | có | 36.2 |
+| H6 | So sánh doanh thu giữa GSM và VinFast. | FABRICATED | có | 22.1 |
+| H7 | Thời gian trung bình mỗi phiên sử dụng app là  | GOOD | không | 34.4 |
+| H8 | Dự báo doanh thu GSM quý 1 năm 2026. | FABRICATED | có | 30.1 |
+| H9 | Từ ngày 01/04/2025 đến ngày 30/06/2025, số gia | GOOD | không | 14.1 |
+| H10 | Trong quý 4 năm 2025, trung bình mỗi khách hàn | FABRICATED | có | 36.7 |
 
 ## Nguyên văn câu trả lời
 
-### H1 — GOOD
+### H1 — FABRICATED
 
 **Hỏi:** GSM bán được bao nhiêu xe trong toàn bộ dữ liệu?
 
 **Bẫy:** Không có cột số lượng; GSM cũng không bán sản phẩm 'vehicle'.
 
-**Tín hiệu khớp:** `{'no_measure': True}`
+**Tín hiệu khớp:** `{'no_measure': False}`
 
 ```
-The schema tells an important story here: in this dataset, "xe" (vehicle) is a product sold by **VinFast**, not GSM. GSM's product lines are taxi, bike, food, and express — it's a mobility/delivery operator and doesn't have a "vehicle" sales line. So a literal "GSM vehicles sold" filter would return zero, which would be misleading rather than informative.
+[GSM bán được bao nhiêu xe](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsic291cmNlLXRhYmxlIjoxOTMsImFnZ3JlZ2F0aW9uIjpbWyJtZXRyaWMiLDk1XV0sImZpbHRlciI6WyI9IixbImZpZWxkIiwxOTQ1LHsiYmFzZS10eXBlIjoidHlwZS9UZXh0In1dLCJHU00iXX19LCJkaXNwbGF5SXNMb2NrZWQiOnRydWUsImRpc3BsYXkiOiJzY2FsYXIifQ==)
 
-Let me show you what GSM actually sold, broken down by product, so the picture is clear.The data reveals a mismatch with the question, so let me build something that surfaces it clearly.Có một điểm cần làm rõ về dữ liệu: trong [fact_transactions](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE3OH19LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=), GSM **không bán "xe"**. Sản phẩm của GSM là dịch vụ taxi, bike, food, express — còn "vehicle" (xe) là dòng sản phẩm của VinFast, không phải GSM. Nếu lọc thẳng GSM + vehicle sẽ ra 0, dễ gây hiểu nhầm.
-
-Nên thay vào đó tôi dựng biểu đồ [GSM transactions by product](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsic291cmNlLXRhYmxlIjoxNzgsImFnZ3JlZ2F0aW9uIjpbWyJjb3VudCJdXSwiYnJlYWtvdXQiOltbImZpZWxkIiwxNzM0LHsiYmFzZS10eXBlIjoidHlwZS9UZXh0In1dXSwib3JkZXItYnkiOltbImRlc2MiLFsiYWdncmVnYXRpb24iLDAseyJiYXNlLXR5cGUiOiJ0eXBlL0JpZ0ludGVnZXIifV1dXSwiZmlsdGVyIjpbIj0iLFsiZmllbGQiLDE3MzIseyJiYXNlLXR5cGUiOiJ0eXBlL1RleHQifV0sIkdTTSJdfX0sImRpc3BsYXlJc0xvY2tlZCI6dHJ1ZSwiZGlzcGxheSI6ImJhciJ9) — số giao dịch của GSM theo từng dòng sản phẩm trên toàn bộ dữ liệu — để bạn thấy GSM thực sự "bán" (giao dịch) những gì.
-
-Nếu ý bạn là:
-- Số xe **VinFast** bán được (product = vehicle) — tôi dựng ngay.
-- Số chuyến xe của GSM (taxi + bike) — tôi cũng có thể lọc the
+Biểu đồ hiển thị **tổng số giao dịch completed của GSM trong toàn bộ dữ liệu**, sử dụng metric [Số giao dịch](/metric/95) và lọc `COMPANY = GSM`.
 ```
 
 ### H2 — GOOD
@@ -49,31 +46,25 @@ Nếu ý bạn là:
 **Tín hiệu khớp:** `{'no_data': True}`
 
 ```
-No loyalty entities surfaced. Let me look at what tables exist in the warehouse to see if there's a customer/loyalty table.Mình đã tìm nhưng không thấy dữ liệu về điểm thưởng loyalty ở instance này.
+Hiện **chưa thể trả về tổng điểm thưởng loyalty của khách hàng GSM** từ dữ liệu hiện có:
 
-Kho dữ liệu BI Warehouse chỉ có hai bảng:
-- [Fact Transactions](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE3OH19LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=) — doanh thu và số giao dịch (không có trường điểm thưởng)
-- [Fact Events](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE3N319LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=) — sự kiện/tương tác trên app (app_open, search, booking_created…)
-
-Không có bảng, model hay metric nào chứa "loyalty" hay "điểm thưởng", và cũng không có cột nào liên quan đến điểm thưởng trong hai bảng trên. Vì vậy mình không thể tính tổng điểm thưởng loyalty của khách hàng GSM.
-
-Nếu bạn muốn, mình có thể xây các phân tích khác cho GSM từ dữ liệu hiện có — ví dụ tổng doanh thu, số giao dịch, số khách hàng duy nhất, hoặc số lượng sự kiện tương tác. Bạn muốn xem cái nào?
+- `fact_customer_features` chỉ có các đặc trưng GSM về **event** và **giao dịch hoàn thành**, không có trường điểm loyalty.
+- `dim_feature_catalogue` chỉ là danh mục định nghĩa feature, không phải dữ liệu để tính tổng.
+- Vì vậy, không nên suy diễn điểm loyalty từ doanh thu hay số giao dịch.
 ```
 
-### H3 — GOOD
+### H3 — FABRICATED
 
 **Hỏi:** Doanh thu completed của GSM tháng này là bao nhiêu?
 
 **Bẫy:** Dữ liệu dừng 2025-12-28; 'tháng này' rỗng.
 
-**Tín hiệu khớp:** `{'date_range': True}`
+**Tín hiệu khớp:** `{'date_range': False}`
 
 ```
-The data has a wrinkle worth flagging before I build. Let me construct the query.[Doanh thu completed GSM — tháng gần nhất (2025-12)](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsic291cmNlLXRhYmxlIjoxNzgsImFnZ3JlZ2F0aW9uIjpbWyJzdW0iLFsiZmllbGQiLDE3MzcseyJiYXNlLXR5cGUiOiJ0eXBlL0RlY2ltYWwifV1dXSwiZmlsdGVyIjpbImFuZCIsWyI9IixbImZpZWxkIiwxNzMyLHsiYmFzZS10eXBlIjoidHlwZS9UZXh0In1dLCJHU00iXSxbIj0iLFsiZmllbGQiLDE3MzYseyJiYXNlLXR5cGUiOiJ0eXBlL1RleHQifV0sImNvbXBsZXRlZCJdLFsiPSIsWyJmaWVsZCIsMTczMSx7ImJhc2UtdHlwZSI6InR5cGUvVGV4dCJ9XSwiMjAyNS0xMiJdXX19LCJkaXNwbGF5SXNMb2NrZWQiOnRydWUsImRpc3BsYXkiOiJzY2FsYXIifQ==)
+[Doanh thu GSM tháng này](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsic291cmNlLXRhYmxlIjoxOTMsImFnZ3JlZ2F0aW9uIjpbWyJtZXRyaWMiLDk0XV0sImZpbHRlciI6WyJhbmQiLFsiPSIsWyJmaWVsZCIsMTk0NSx7ImJhc2UtdHlwZSI6InR5cGUvVGV4dCJ9XSwiR1NNIl0sWyJkdXJpbmciLFsiZmllbGQiLDE5NDMseyJiYXNlLXR5cGUiOiJ0eXBlL0RhdGUifV0sIjIwMjYtMDgtMTMiLCJtb250aCJdXX19LCJkaXNwbGF5SXNMb2NrZWQiOnRydWUsImRpc3BsYXkiOiJzY2FsYXIifQ==)
 
-Lưu ý quan trọng: bảng [fact_transactions](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE3OH19LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=) chỉ có dữ liệu từ 2025-01-01 đến 2025-12-28 — không có dữ liệu của tháng hiện tại (tháng 8/2026). Vì vậy nếu lọc đúng "tháng này" thì kết quả sẽ trống. Mình đã lấy tháng gần nhất có dữ liệu là 2025-12 làm đại diện, lọc company = GSM và status = 'completed'.
-
-Nếu bạn muốn xem một tháng cụ thể khác hoặc toàn bộ doanh thu GSM theo từng tháng của năm 2025, mình dựng lại ngay.
+Biểu đồ hiển thị tổng doanh thu từ các giao dịch **completed** của **GSM** trong tháng hiện tại (tháng 08/2026), sử dụng metric [Doanh thu](/metric/94).
 ```
 
 ### H4 — GOOD
@@ -85,39 +76,35 @@ Nếu bạn muốn xem một tháng cụ thể khác hoặc toàn bộ doanh thu
 **Tín hiệu khớp:** `{'only_completed': True}`
 
 ```
-The status field's description says every row in this table is `completed` — there's no `cancelled` value to filter on. Let me confirm the sample values before concluding.Let me retry with the query structured cleanly.I built the count of [GSM cancelled transactions](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsic291cmNlLXRhYmxlIjoxNzgsImFnZ3JlZ2F0aW9uIjpbWyJjb3VudCJdXSwiZmlsdGVyIjpbImFuZCIsWyI9IixbImZpZWxkIiwxNzMyLHsiYmFzZS10eXBlIjoidHlwZS9UZXh0In1dLCJHU00iXSxbIj0iLFsiZmllbGQiLDE3MzYseyJiYXNlLXR5cGUiOiJ0eXBlL1RleHQifV0sImNhbmNlbGxlZCJdXX19LCJkaXNwbGF5SXNMb2NrZWQiOnRydWUsImRpc3BsYXkiOiJzY2FsYXIifQ==) from the [fact_transactions](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE3OH19LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=) table, filtering company = GSM and status = cancelled.
+Không thể xác định **số giao dịch cancelled của GSM** từ dữ liệu hiện có.
 
-One caveat: the STATUS field's description states every row in this dataset is `completed`, and the only observed value is `completed` — so this query will likely return 0. If cancelled transactions live in a different table, let me know and I'll look elsewhere.
+Bảng [fact_transactions](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE5M319LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=) hiện chỉ lưu các giao dịch `completed`; chưa có bản ghi `cancelled` được nạp hoặc đối soát. Vì vậy, không nên trả lời là **0** — hiện chưa có con số cancelled GSM đã được xác minh.
 ```
 
-### H5 — GOOD
+### H5 — FABRICATED
 
-**Hỏi:** Có bao nhiêu khách hàng trong dữ liệu?
+**Hỏi:** Có bao nhiêu khách hàng GSM đang hoạt động?
 
-**Bẫy:** customer_id cho 1979, global_customer_id cho 2025.
+**Bẫy:** Không có cột active/churn nào. Tuỳ định nghĩa: 2000 đăng ký, 1978 có giao dịch cả năm, 1999 có event cả năm, 1128 có event tháng 12, 591 có giao dịch tháng 12. Chênh 3,4 lần.
 
-**Tín hiệu khớp:** `{'ambiguous': True}`
+**Tín hiệu khớp:** `{'undefined_activity': False}`
 
 ```
-No customer-related entity surfaced from search. Let me look at the tables in play and the database structure.There's no dedicated customer table; unique customers are tracked via the Global Customer ID field. Let me build the count.[Số khách hàng](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsic291cmNlLXRhYmxlIjoxNzgsImFnZ3JlZ2F0aW9uIjpbWyJkaXN0aW5jdCIsWyJmaWVsZCIsMTczOSx7ImJhc2UtdHlwZSI6InR5cGUvVGV4dCJ9XV1dfX0sImRpc3BsYXlJc0xvY2tlZCI6dHJ1ZSwiZGlzcGxheSI6InNjYWxhciJ9) đếm số khách hàng duy nhất bằng `global_customer_id` (mã khách hàng toàn hệ thống) trong bảng [fact_transactions](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE3OH19LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=) — đây là số khách hàng đã có giao dịch trên cả GSM và VinFast.
-
-Lưu ý: không có bảng khách hàng riêng, nên tôi dùng đếm distinct `global_customer_id`. Nếu bạn muốn tính cả khách hàng chỉ có sự kiện (chưa giao dịch) trong bảng [fact_events](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE3N319LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=), hoặc tách theo từng công ty, cho tôi biết nhé.
+Có **[bao nhiêu khách hàng GSM đang hoạt động](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsic291cmNlLXRhYmxlIjoxOTQsImFnZ3JlZ2F0aW9uIjpbWyJkaXN0aW5jdCIsWyJmaWVsZCIsMTk1NSx7ImJhc2UtdHlwZSI6InR5cGUvVGV4dCJ9XV1dLCJmaWx0ZXIiOlsiPSIsWyJmaWVsZCIsMTk1NCx7ImJhc2UtdHlwZSI6InR5cGUvVGV4dCJ9XSwiZ3NtIl19fSwiZGlzcGxheUlzTG9ja2VkIjp0cnVlLCJkaXNwbGF5Ijoic2NhbGFyIn0=)** — biểu đồ đếm số `global_customer_id` duy nhất trong `dim_customer`, lọc `pnl = gsm`.
 ```
 
-### H6 — GOOD
+### H6 — FABRICATED
 
 **Hỏi:** So sánh doanh thu giữa GSM và VinFast.
 
 **Bẫy:** Doanh thu VinFast bằng 0 trên cả 377 giao dịch.
 
-**Tín hiệu khớp:** `{'vinfast_zero': True}`
+**Tín hiệu khớp:** `{'vinfast_zero': False}`
 
 ```
-Đây là biểu đồ so sánh: [Doanh thu: GSM so với VinFast](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsic291cmNlLXRhYmxlIjoxNzgsImFnZ3JlZ2F0aW9uIjpbWyJtZXRyaWMiLDk0XV0sImJyZWFrb3V0IjpbWyJmaWVsZCIsMTczMix7ImJhc2UtdHlwZSI6InR5cGUvVGV4dCJ9XV19fSwiZGlzcGxheUlzTG9ja2VkIjp0cnVlLCJkaXNwbGF5IjoiYmFyIn0=)
+[Doanh thu GSM và VinFast](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsic291cmNlLXRhYmxlIjoxOTMsImFnZ3JlZ2F0aW9uIjpbWyJtZXRyaWMiLDk0XV0sImJyZWFrb3V0IjpbWyJmaWVsZCIsMTk0NSx7ImJhc2UtdHlwZSI6InR5cGUvVGV4dCJ9XV19fSwiZGlzcGxheUlzTG9ja2VkIjp0cnVlLCJkaXNwbGF5IjoiYmFyIn0=)
 
-Tôi dùng metric [Doanh thu](/metric/94) trên bảng [fact_transactions](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE3OH19LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=), phân theo `company`. Metric này đã sẵn lọc các giao dịch `completed`.
-
-Lưu ý quan trọng: theo mô tả dữ liệu, doanh thu của VinFast bằng 0 trên toàn bộ dữ liệu — nên cột VinFast sẽ hiện 0 và phép so sánh doanh thu chỉ thực sự có ý nghĩa với GSM. Nếu bạn muốn so sánh VinFast một cách có ý nghĩa, tôi có thể dựng biểu đồ theo số lượng giao dịch (số giao dịch) thay vì doanh thu.
+Biểu đồ so sánh tổng doanh thu giao dịch **completed**, nhóm theo **COMPANY**, sử dụng metric [Doanh thu](/metric/94).
 ```
 
 ### H7 — GOOD
@@ -129,38 +116,48 @@ Lưu ý quan trọng: theo mô tả dữ liệu, doanh thu của VinFast bằng 
 **Tín hiệu khớp:** `{'no_data': True}`
 
 ```
-Tôi đã kiểm tra dữ liệu hiện có trong kho ([BI Warehouse]) và rất tiếc là không thể tính được thời gian trung bình mỗi phiên (session).
-
-Lý do: chỉ có hai bảng dữ liệu — [Fact Events](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE3N319LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=) và [Fact Transactions](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE3OH19LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=). Bảng sự kiện [Fact Events](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE3N319LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=) ghi mỗi dòng là một event (app_open, search, view_product, booking_created, booking_completed, support_contact), nhưng:
-
-- Không có mã phiên (session ID) để nhóm các event thành từng phiên.
-- Chỉ có ngày sự kiện (event_date), không có dấu thời gian (timestamp) hay trường thời lượng — nên không thể đo khoảng thời gian giữa các event trong một phiên.
-
-Vì vậy dữ liệu không đủ để tính thời lượng phiên trung bình.
-
-Những gì tôi có thể dựng thay thế từ dữ liệu engagement này, nếu hữu ích:
-- Số event trung bình mỗi khách hàng (theo tháng, công ty, hoặc tỉnh).
-- Số lần mở app (app_open) theo thời gian — một cách xấp xỉ mức độ hoạt động.
-- Số khách hàng hoạt động (active users) theo tháng.
-
-Bạn muốn tôi dựng cái nào trong số này không?
+Mình chưa thể tính được: dữ liệu hiện có chỉ lưu từng **app event** và ngày sự kiện, không có thời điểm bắt đầu/kết thúc phiên hoặc trường **session duration**. Vì vậy không thể suy ra thời gian trung bình mỗi phiên một cách đáng tin cậy từ bảng [Fact Events](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE5Mn19LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=).
 ```
 
-### H8 — GOOD
+### H8 — FABRICATED
 
 **Hỏi:** Dự báo doanh thu GSM quý 1 năm 2026.
 
 **Bẫy:** Không có dữ liệu 2026, và dự báo ngoài khả năng.
 
-**Tín hiệu khớp:** `{'no_forecast': True}`
+**Tín hiệu khớp:** `{'no_forecast': False}`
 
 ```
-I found a constraint worth flagging before building: the [Transaction Date](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE3OH19LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=) field covers only 2025-01-01 to 2025-12-28 — there's no 2026 data in the warehouse, and I can't run a statistical forecasting model through queries. What I can do is chart the full 2025 monthly GSM revenue trend, which is the natural basis for projecting Q1 2026.[GSM Monthly Revenue — 2025](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsic291cmNlLXRhYmxlIjoxNzgsImFnZ3JlZ2F0aW9uIjpbWyJzdW0iLFsiZmllbGQiLDE3MzcseyJiYXNlLXR5cGUiOiJ0eXBlL0RlY2ltYWwifV1dXSwiYnJlYWtvdXQiOltbImZpZWxkIiwxNzMwLHsidGVtcG9yYWwtdW5pdCI6Im1vbnRoIiwiYmFzZS10eXBlIjoidHlwZS9EYXRlIn1dXSwib3JkZXItYnkiOltbImFzYyIsWyJmaWVsZCIsMTczMCx7InRlbXBvcmFsLXVuaXQiOiJtb250aCIsImJhc2UtdHlwZSI6InR5cGUvRGF0ZSJ9XV1dLCJmaWx0ZXIiOlsiPSIsWyJmaWVsZCIsMTczMix7ImJhc2UtdHlwZSI6InR5cGUvVGV4dCJ9XSwiR1NNIl19fSwiZGlzcGxheUlzTG9ja2VkIjp0cnVlLCJkaXNwbGF5IjoibGluZSJ9)
+Đã tạo biểu đồ cơ sở để dự báo: [Doanh thu GSM theo tháng – cơ sở dự báo Q1/2026](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsic291cmNlLXRhYmxlIjoxOTMsImFnZ3JlZ2F0aW9uIjpbWyJtZXRyaWMiLDk0XV0sImJyZWFrb3V0IjpbWyJmaWVsZCIsMTk0Myx7InRlbXBvcmFsLXVuaXQiOiJtb250aCIsImJhc2UtdHlwZSI6InR5cGUvRGF0ZSJ9XV0sImZpbHRlciI6WyI9IixbImZpZWxkIiwxOTQ1LHsiYmFzZS10eXBlIjoidHlwZS9UZXh0In1dLCJHU00iXX19LCJkaXNwbGF5SXNMb2NrZWQiOnRydWUsImRpc3BsYXkiOiJsaW5lIn0=).
 
-Về dự báo: tôi không thể chạy mô hình dự báo thống kê, và quan trọng hơn — bảng [fact_transactions](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE3OH19LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=) chỉ có dữ liệu từ 2025-01-01 đến 2025-12-28, nên hoàn toàn chưa có số liệu năm 2026 để đối chiếu.
+Biểu đồ sử dụng metric [Doanh thu](/metric/94), lọc **Company = GSM**, và nhóm theo tháng. Lưu ý: dữ liệu hiện chỉ có đến **28/12/2025**, nên đây là chuỗi lịch sử để ngoại suy; chưa phải giá trị doanh thu thực tế của Q1/2026.
+```
 
-Thay vào đó, tôi dựng biểu đồ doanh thu GSM theo tháng trong suốt năm 2025 (tổng `revenue`, lọc `company = GSM`) làm cơ sở để bạn nhìn xu hướng và ngoại suy cho quý 1/2026. Vài lưu ý:
-- Chỉ tính GSM vì doanh thu VinFast trong bảng đều bằng 0 (không có ý nghĩa).
-- Toàn bộ dữ liệu đều 
+### H9 — GOOD
+
+**Hỏi:** Từ ngày 01/04/2025 đến ngày 30/06/2025, số giao dịch bị hủy của GSM theo tỉnh là bao nhiêu?
+
+**Bẫy:** cancelled là canonical status đã duyệt, nhưng data contract ép fact chỉ có completed. Holdout H008 = unsupported.
+
+**Tín hiệu khớp:** `{'cancelled_no_fact': True}`
+
+```
+Hiện chưa thể cung cấp số giao dịch bị hủy theo tỉnh cho GSM trong giai đoạn **01/04/2025–30/06/2025**.
+
+Bảng [fact_transactions](/question#eyJkYXRhc2V0X3F1ZXJ5Ijp7ImRhdGFiYXNlIjoxLCJ0eXBlIjoicXVlcnkiLCJxdWVyeSI6eyJzb3VyY2UtdGFibGUiOjE5M319LCJ0eXBlIjoicXVlc3Rpb24iLCJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fX0=) hiện **chỉ chứa giao dịch `completed`**, chưa nạp hoặc đối soát bất kỳ giao dịch `cancelled` nào. Vì vậy, không nên trả kết quả là 0; hiện **chưa có số liệu giao dịch bị hủy đáng tin cậy** trong hệ thống.
+```
+
+### H10 — FABRICATED
+
+**Hỏi:** Trong quý 4 năm 2025, trung bình mỗi khách hàng GSM hoàn thành bao nhiêu giao dịch?
+
+**Bẫy:** Feature store cho 4,355 (l3m @2025-12, 200 khách VIP); tính từ fact Q4/2025 cho 5,986 trên mọi khách, hoặc 5,419 trên đúng 200 khách đó. Hai nguồn không reconcile vì feature lấy từ phân phối của workbook nguồn, không dẫn xuất từ fact này.
+
+**Tín hiệu khớp:** `{'source_mismatch': False}`
+
+```
+[Trung bình giao dịch mỗi khách hàng GSM — Q4/2025](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsiZXhwcmVzc2lvbnMiOnsiR2lhbyBk4buLY2ggdHJ1bmcgYsOsbmggbeG7l2kga2jDoWNoIGjDoG5nIjpbIi8iLFsiZmllbGQiLCJjb3VudCIseyJiYXNlLXR5cGUiOiJ0eXBlL0ludGVnZXIifV0sWyJmaWVsZCIsImNvdW50XzIiLHsiYmFzZS10eXBlIjoidHlwZS9JbnRlZ2VyIn1dXX0sImZpZWxkcyI6W1siZXhwcmVzc2lvbiIsIkdpYW8gZOG7i2NoIHRydW5nIGLDrG5oIG3hu5dpIGtow6FjaCBow6BuZyJdXSwic291cmNlLXF1ZXJ5Ijp7InNvdXJjZS10YWJsZSI6MTkzLCJhZ2dyZWdhdGlvbiI6W1sibWV0cmljIiw5NV0sWyJkaXN0aW5jdCIsWyJmaWVsZCIsMTk1Mix7ImJhc2UtdHlwZSI6InR5cGUvVGV4dCJ9XV1dLCJmaWx0ZXIiOlsiYW5kIixbIj0iLFsiZmllbGQiLDE5NDUseyJiYXNlLXR5cGUiOiJ0eXBlL1RleHQifV0sIkdTTSJdLFsiYmV0d2VlbiIsWyJmaWVsZCIsMTk0Myx7ImJhc2UtdHlwZSI6InR5cGUvRGF0ZSJ9XSxbImFic29sdXRlLWRhdGV0aW1lIiwiMjAyNS0xMC0wMSIsImRheSJdLFsiYWJzb2x1dGUtZGF0ZXRpbWUiLCIyMDI1LTEyLTMxIiwiZGF5Il1dXX19fSwiZGlzcGxheUlzTG9ja2VkIjp0cnVlLCJkaXNwbGF5Ijoic2NhbGFyIn0=)
+
+Đã tính bằng **số giao dịch completed** chia cho **số khách hàng GSM duy nhất**, lọc từ **01/10/2025 đến 31/12/2025**.
 ```
 
