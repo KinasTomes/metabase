@@ -401,6 +401,17 @@ không có tác dụng lên volume đã tồn tại, và triệu chứng là m�
 adapter **`openrouter`** (nói `/chat/completions`): 3/3. Tên provider ở đây chỉ là định
 dạng giao thức, không liên quan openrouter.ai.
 
+**Chunk tool call lạc nhóm giết cả agent loop.** `aisdk-chunks->part`
+(`metabase.metabot.self.core`) là một `case` đóng, và hai chunk của họ tool-input không
+có clause: group mở đầu bằng `:tool-input-available` (parallel tool calls tách qua flush
+boundary — Q15) hoặc `:tool-input-delta` (provider mở tool call không có id/name trên
+chunk đầu nên adapter không emit start — Q11). Một lỗi duy nhất biến cả turn thành
+`ERROR`, harness chấm sai thành model hỏng. Đã vá cả hai clause về part `:tool-input`
+thường; mất argument thì degrade về sentinel `{:_raw_arguments ""}` để schema validation
+từ chối lịch sự thay vì crash. Bài học chung: adapter giả định stream well-formed, còn
+gateway free thì đúng là nơi phát sinh shape lạ — mọi `case` trên chunk type đều cần
+nghĩ tới chuyện thiếu vắng chunk mở đầu.
+
 ## 10. Còn thiếu
 
 - Q10/Q12 vẫn sai trên `gpt-5.6-luna`; bản vá ở tầng mô tả đã chứng minh là không đủ.
