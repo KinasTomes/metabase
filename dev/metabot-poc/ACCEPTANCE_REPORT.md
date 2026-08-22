@@ -7,9 +7,8 @@ số với `EXPECTED_RESULTS.md`, không chấm bằng câu chữ.
 
 | Verdict | Số câu |
 | --- | ---: |
-| PASS | 14 |
+| PASS | 15 |
 | WRONG | 1 |
-| ERROR | 1 |
 
 ## Chi tiết
 
@@ -24,7 +23,7 @@ số với `EXPECTED_RESULTS.md`, không chấm bằng câu chữ.
 | 7 | So sánh số giao dịch completed của GSM và VinFast theo thá... | PASS | 24 rows (12 months x 2 companies) | 36.4 |
 | 8 | Số giao dịch completed của GSM theo tỉnh trong toàn bộ dữ ... | PASS | 8 groups all matching | 34.1 |
 | 9 | Số giao dịch completed của VinFast theo sản phẩm trong toà... | PASS | 3 groups all matching | 26.9 |
-| 10 | Số event của GSM trong toàn bộ dữ liệu là bao nhiêu? | ERROR | {"type": "error", "errorText": "openrouter API request failed: Read timed out"} | 135.3 |
+| 10 | Số event của GSM trong toàn bộ dữ liệu là bao nhiêu? | PASS | PASS | 160.7 |
 | 11 | Số event của VinFast theo tháng trong toàn bộ dữ liệu. | PASS | 12 groups all matching | 23.5 |
 | 12 | Số event của GSM theo tên sự kiện trong toàn bộ dữ liệu. | PASS | 6 groups all matching | 57.8 |
 | 13 | Số event của VinFast theo tỉnh trong toàn bộ dữ liệu. | PASS | 8 groups all matching | 22.9 |

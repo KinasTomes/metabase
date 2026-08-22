@@ -944,20 +944,71 @@
     "n": 10,
     "question": "Số event của GSM trong toàn bộ dữ liệu là bao nhiêu?",
     "tools": [
+      "load_skill",
       "search",
       "read_resource",
       "read_resource",
-      "load_skill",
-      "read_resource"
+      "construct_notebook_query"
     ],
-    "answer": "Tốt rồi — `fact_events` có cột `company` với giá trị `\"GSM\"`. Câu hỏi là \"tổng số event của GSM\", tức",
-    "errors": [
-      "{\"type\": \"error\", \"errorText\": \"openrouter API request failed: Read timed out\"}"
+    "answer": "Đây là kết quả bạn cần:\n\n[Số event của GSM — toàn bộ dữ liệu](/question#eyJ2aXN1YWxpemF0aW9uX3NldHRpbmdzIjp7fSwiZGF0YXNldF9xdWVyeSI6eyJkYXRhYmFzZSI6MSwidHlwZSI6InF1ZXJ5IiwicXVlcnkiOnsic291cmNlLXRhYmxlIjoxOTIsImFnZ3JlZ2F0aW9uIjpbWyJjb3VudCJdXSwiZmlsdGVyIjpbIj0iLFsiZmllbGQiLDE5MzYseyJiYXNlLXR5cGUiOiJ0eXBlL1RleHQifV0sIkdTTSJdfX0sImRpc3BsYXlJc0xvY2tlZCI6dHJ1ZSwiZGlzcGxheSI6InNjYWxhciJ9)\n\nTôi dùng bảng `fact_events`, lọc `company = \"GSM\"`, và đếm tất cả các dòng (count). Kết quả hiển thị tổng số event của GSM trên toàn bộ dữ liệu.\n\n**Lưu ý:** Giá trị `company = \"GSM\"` dựa trên dữ liệu mẫu trong schema; đây là cách lọc chuẩn để tách dữ liệu GSM khỏi VinFast.",
+    "errors": [],
+    "query": {
+      "lib/type": "mbql/query",
+      "stages": [
+        {
+          "lib/type": "mbql.stage/mbql",
+          "source-table": 192,
+          "filters": [
+            [
+              "=",
+              {
+                "lib/uuid": "882dd86b-805d-48ad-b01d-5060452c4e70"
+              },
+              [
+                "field",
+                {
+                  "lib/uuid": "e467c7be-bc5b-4e7f-9698-5c98fe39694a",
+                  "base-type": "type/Text",
+                  "effective-type": "type/Text"
+                },
+                1936
+              ],
+              "GSM"
+            ]
+          ],
+          "aggregation": [
+            [
+              "count",
+              {
+                "lib/uuid": "abd63161-4630-437c-ab6c-37db08ca0e36"
+              }
+            ]
+          ]
+        }
+      ],
+      "database": 1,
+      "lib/metadata": null
+    },
+    "seconds": 160.7,
+    "rows": [
+      [
+        20049
+      ]
     ],
-    "query": null,
-    "seconds": 135.3,
-    "verdict": "ERROR",
-    "detail": "{\"type\": \"error\", \"errorText\": \"openrouter API request failed: Read timed out\"}"
+    "verdict": "PASS",
+    "detail": "PASS",
+    "runs": [
+      {
+        "verdict": "PASS",
+        "detail": "20049",
+        "seconds": 160.7
+      },
+      {
+        "verdict": "PASS",
+        "detail": "20049",
+        "seconds": 83.0
+      }
+    ]
   },
   {
     "n": 11,
