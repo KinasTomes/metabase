@@ -170,6 +170,17 @@
                             :id        (:toolCallId chunk)
                             :function  (:toolName chunk)
                             :arguments (parse-tool-arguments chunks)}
+    ;; A group can *start* here when the opening :tool-input-start never made it
+    ;; into the same group — parallel tool calls splitting across flush
+    ;; boundaries, or a provider that omits the start chunk. Consolidate to the
+    ;; regular part instead of throwing "No matching clause" and killing the
+    ;; whole agent turn. Whatever argument deltas share the group are parsed;
+    ;; their absence degrades to the {:_raw_arguments ""} sentinel, which schema
+    ;; validation rejects politely at the tool boundary.
+    :tool-input-available  {:type      :tool-input
+                            :id        (:toolCallId chunk)
+                            :function  (:toolName chunk)
+                            :arguments (parse-tool-arguments chunks)}
     :tool-output-available {:type        :tool-output
                             :id          (:toolCallId chunk)
                             :function    (:toolName chunk)
