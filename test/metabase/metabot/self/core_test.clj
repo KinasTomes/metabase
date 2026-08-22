@@ -50,3 +50,26 @@
                   [{:type :tool-input-start :toolCallId "a" :toolName "search"}
                    ;; the id change flushes a's group before b's available lands
                    {:type :tool-input-available :toolCallId "b" :toolName "analyze_chart"}])))))
+
+(deftest aisdk-xf-tolerates-startless-tool-call-test
+  (testing "a provider that opens a tool call without id/name emits deltas only; the
+           group then heads with :tool-input-delta, which used to throw
+           'No matching clause' (observed live on Q11)"
+    (let [parts (into []
+                      (self.core/aisdk-xf)
+                      [{:type :tool-input-delta :toolCallId "t9" :inputTextDelta "{\"month\":"}
+                       {:type :tool-input-delta :toolCallId "t9" :inputTextDelta "\"2025-12\"}"}
+                       {:type :tool-input-available :toolCallId "t9" :toolName "construct_notebook_query"}])]
+      (is (=? [{:type      :tool-input
+                :id        "t9"
+                :function  "construct_notebook_query"
+                :arguments {:month "2025-12"}}]
+              parts))))
+  (testing "and when the stream ends before the closing chunk, the deltas alone still consolidate"
+    (is (=? [{:type      :tool-input
+              :id        "t8"
+              :function  nil
+              :arguments {:ok true}}]
+            (into []
+                  (self.core/aisdk-xf)
+                  [{:type :tool-input-delta :toolCallId "t8" :inputTextDelta "{\"ok\":true}"}])))))
