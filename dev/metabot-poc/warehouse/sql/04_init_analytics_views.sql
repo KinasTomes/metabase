@@ -45,7 +45,7 @@ SELECT
 FROM silver.transactions t;
 
 COMMENT ON VIEW analytics.fact_transactions IS
-    'One row per transaction (giao dịch). Revenue and transaction counts for GSM and VinFast, broken down by month, product, and province. Carries completed transactions only — see the status column before answering anything about cancellations.';
+    'One row per transaction (giao dịch). THE table for doanh thu (revenue), số giao dịch (transaction count), theo tháng/tháng nào (by month), sản phẩm (product), tỉnh (province) — for GSM and VinFast. Carries completed transactions only — see the status column before answering anything about cancellations.';
 
 COMMENT ON COLUMN analytics.fact_transactions.transaction_id IS
     'Unique transaction identifier. Count rows to get số giao dịch (transaction count).';
@@ -91,7 +91,7 @@ SELECT
 FROM silver.events e;
 
 COMMENT ON VIEW analytics.fact_events IS
-    'One row per app event (sự kiện) for GSM and VinFast. Use for engagement questions: event counts by month, event name, or province. Contains no revenue.';
+    'One row per app event (sự kiện, tương tác trên app) for GSM and VinFast. THE table for số event (event count), sự kiện nào (by event name), theo tháng (by month), tỉnh (province). Contains no revenue — doanh thu lives in fact_transactions.';
 
 COMMENT ON COLUMN analytics.fact_events.event_id IS
     'Unique event identifier. Count rows to get số event (event count).';

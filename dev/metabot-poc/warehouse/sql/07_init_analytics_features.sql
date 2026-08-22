@@ -77,7 +77,7 @@ WHERE v.registry_version = '1.0.0'
 GROUP BY v.global_customer_id, v.snapshot_month;
 
 COMMENT ON VIEW analytics.fact_customer_features IS
-    'One row per customer per month with the 20 servable feature store features as columns (feature store, đặc trưng khách hàng). Covers 2025-01 to 2025-12 and 200 customers only — a curated subset, NOT the full customer base in dim_global_customer. Both GSM and VinFast features sit on the same row, so cross-unit comparison needs no join. Join to analytics.dim_global_customer on global_customer_id. Completed-transaction and app-event measures only: 14 cancelled-transaction features are defined in the registry but deliberately NOT served here, because no cancelled transaction exists in the fact layer to reconcile them against. Look them up in analytics.dim_feature_catalogue and report the reason — never a figure.';
+    'One row per customer per month with the 20 servable feature store features as columns (feature store, đặc trưng khách hàng). THE table for per-customer measures: số giao dịch hoàn thành trong N tháng gần nhất của một khách hàng (completed transaction counts), số sự kiện trên app (event counts), theo khoảng thời gian l1w/l1m/l3m/l6m/l12m. Covers 2025-01 to 2025-12 and 200 customers only — a curated subset, NOT the full customer base in dim_global_customer. Both GSM and VinFast features sit on the same row, so cross-unit comparison needs no join. Join to analytics.dim_global_customer on global_customer_id. Completed-transaction and app-event measures only: 14 cancelled-transaction features are defined in the registry but deliberately NOT served here, because no cancelled transaction exists in the fact layer to reconcile them against. Look them up in analytics.dim_feature_catalogue and report the reason — never a figure.';
 
 COMMENT ON COLUMN analytics.fact_customer_features.global_customer_id IS
     'Cross-company customer identifier (mã khách hàng toàn hệ thống). Join key to analytics.dim_customer.';
@@ -199,7 +199,7 @@ FROM feature_store.feature_registry r
 WHERE r.registry_version = '1.0.0';
 
 COMMENT ON VIEW analytics.dim_feature_catalogue IS
-    'Catalogue of every registered feature store feature (danh mục đặc trưng), including ones that cannot be queried. Use it to answer "does this measure exist" and "why can I not get a number for it". A row here is NOT data — it is a definition. Only features with serving_status = ''servable'' have columns in analytics.fact_customer_features.';
+    'Catalogue of every registered feature store feature (danh mục đặc trưng), including ones that cannot be queried. THE place to check before answering any per-customer measure question: it tells you whether the measure exists and whether it can be served. Use it to answer "does this measure exist" and "why can I not get a number for it". A row here is NOT data — it is a definition. Only features with serving_status = ''servable'' have columns in analytics.fact_customer_features.';
 
 COMMENT ON COLUMN analytics.dim_feature_catalogue.feature_name IS
     'Registered feature name (tên đặc trưng). Matches the column name in fact_customer_features when serving_status is servable.';

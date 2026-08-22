@@ -34,7 +34,7 @@ SELECT
 FROM silver.customers c;
 
 COMMENT ON VIEW analytics.dim_customer IS
-    'One row per customer within a PnL unit (khách hàng). Join to fact_transactions or fact_events on BOTH customer_id and pnl. Use global_customer_id to reach fact_customer_features or to count a person once across GSM and VinFast.';
+    'One row per customer within a PnL unit (khách hàng). Attributes for questions about khách hàng: giới tính (gender), tuổi/năm sinh (age), tỉnh thành (home province), khách hàng VIP (is_vip). Join to fact_transactions or fact_events on BOTH customer_id and pnl. Use global_customer_id to reach fact_customer_features or to count a person once across GSM and VinFast.';
 
 COMMENT ON COLUMN analytics.dim_customer.customer_id IS
     'Customer identifier within the PnL unit (mã khách hàng). Not unique on its own — always pair with pnl when joining.';
@@ -65,7 +65,7 @@ FROM silver.customers c
 GROUP BY c.global_customer_id;
 
 COMMENT ON VIEW analytics.dim_global_customer IS
-    'One row per person (khách hàng toàn hệ thống), unique on global_customer_id. The join target for fact_transactions, fact_events and fact_customer_features. Carries no demographics on purpose: a person''s GSM and VinFast profiles disagree on province, gender and date of birth, so those live in dim_customer at the PnL grain instead.';
+    'One row per person (khách hàng toàn hệ thống), unique on global_customer_id. Use for counting distinct people across GSM and VinFast, or khách hàng dùng cả hai công ty (has_gsm + has_vinfast). The join target for fact_transactions, fact_events and fact_customer_features. Carries no demographics on purpose: a person''s GSM and VinFast profiles disagree on province, gender and date of birth, so those live in dim_customer at the PnL grain instead.';
 
 COMMENT ON COLUMN analytics.dim_global_customer.global_customer_id IS
     'Cross-company customer identifier (mã khách hàng toàn hệ thống). Unique — count rows here for the number of distinct people.';
