@@ -15,8 +15,9 @@ can be inspected while it is still going and a crash does not lose the work
 already done.
 
 Usage:
-    python dev/metabot-poc/run_acceptance.py            # all questions
-    python dev/metabot-poc/run_acceptance.py 1 5 12     # only these
+    python dev/metabot-poc/run_acceptance.py                 # all questions
+    python dev/metabot-poc/run_acceptance.py 1 5 12          # only these
+    python dev/metabot-poc/run_acceptance.py --runs 3        # majority verdict
 """
 
 import base64
@@ -227,9 +228,19 @@ def gateway_error(outcome):
     return match.group(0).strip("[") + ": " + outcome["text"].strip()[:160] if match else None
 
 
+# Rate limits, upstream queueing, gateway timeouts and dropped connections are
+# all worth a retry. The timeout strings are matched against the error channel
+# only ("openrouter API request failed: Read timed out" arrives as an SSE error
+# event) so model prose mentioning the word cannot trigger a retry.
+RETRYABLE_IN_ERRORS = ("429", "rate limit", "usagelimit", "timed out", "timeout")
+
+
 def is_retryable(outcome):
     """Rate limits, upstream queueing, and gateway timeouts are all worth a retry."""
-    blob = (" ".join(outcome["errors"]) + " " + outcome["text"][:400]).lower()
+    errors = " ".join(outcome["errors"]).lower()
+    if any(s in errors for s in RETRYABLE_IN_ERRORS):
+        return True
+    blob = outcome["text"][:400].lower()
     if any(s in blob for s in ("429", "rate limit", "usagelimit")):
         return True
     match = GATEWAY_ERROR_RE.match(outcome["text"].strip())
@@ -304,18 +315,21 @@ def run_one(num, question, spec, retries=RATE_LIMIT_RETRIES):
     started = time.time()
 
     for attempt in range(retries + 1):
+        transport_error = None
         try:
             outcome = ask(question)
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
-            return {"n": num, "question": question, "verdict": "ERROR",
-                    "detail": f"{type(exc).__name__}: {exc}",
-                    "seconds": round(time.time() - started, 1)}
+            # A dropped socket is the same class of flake as an in-band gateway
+            # timeout: synthesize the outcome shape and let the retry logic
+            # treat it uniformly instead of failing the question outright.
+            transport_error = f"{type(exc).__name__}: {exc}"
+            outcome = {"text": "", "tools": [], "errors": [transport_error], "query": None}
 
-        if not is_retryable(outcome) or attempt == retries:
+        if attempt == retries or not is_retryable(outcome):
             break
         # Free tiers meter over a window, so back off rather than hammering.
         wait = RATE_LIMIT_BACKOFF * (2 ** attempt)
-        reason = gateway_error(outcome) or "rate limited"
+        reason = gateway_error(outcome) or transport_error or "rate limited"
         print(f"     {reason[:70]} — retrying in {wait}s "
               f"(attempt {attempt + 1}/{retries})", flush=True)
         time.sleep(wait)
@@ -409,35 +423,72 @@ def load_previous():
         return {}
 
 
+def aggregate(records):
+    """Collapse one question's runs into a single record by majority verdict.
+
+    Ties break toward the non-PASS side: a question that flunked once out of
+    two runs is not proven fixed, and the report should not claim it was. The
+    kept body (answer, query, rows) comes from a representative run so the
+    JSON still shows real evidence, and every per-run verdict travels along
+    in `runs`.
+    """
+    counts = {}
+    for r in records:
+        counts[r["verdict"]] = counts.get(r["verdict"], 0) + 1
+    best = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0] == "PASS"))[0][0]
+
+    representative = next((r for r in records if r["verdict"] == best), records[0])
+    merged = dict(representative)
+    merged["verdict"] = best
+    merged["detail"] = " / ".join(sorted(counts))
+    merged["runs"] = [{k: r[k] for k in ("verdict", "detail", "seconds")} for r in records]
+    return merged
+
+
 def main():
-    wanted = {int(a) for a in sys.argv[1:]} or None
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("questions", nargs="*", type=int,
+                        help="only these question numbers; all when omitted")
+    parser.add_argument("--runs", type=int, default=1,
+                        help="ask each question this many times and keep the "
+                             "majority verdict (%(default)s = single run)")
+    args = parser.parse_args()
+
+    wanted = set(args.questions) or None
     todo = [q for q in QUESTIONS if wanted is None or q[0] in wanted]
 
     P.authenticate()
-    print(f"Running {len(todo)} question(s)\n", flush=True)
+    print(f"Running {len(todo)} question(s) x {args.runs} run(s)\n", flush=True)
 
-    merged = load_previous()
-    records = []
+    merged_prev = load_previous()
+    aggregated = []
     for num, question, spec in todo:
         print(f"[{num:>2}] {question[:66]}", flush=True)
-        record = run_one(num, question, spec)
-        records.append(record)
-        merged[num] = record
-        print(f"     {record['verdict']}: {record.get('detail', '')}  ({record['seconds']}s)\n", flush=True)
-        ordered = [merged[k] for k in sorted(merged)]
-        RESULTS_PATH.write_text(json.dumps(ordered, ensure_ascii=False, indent=2), encoding="utf-8")
+        attempts = [run_one(num, question, spec) for _ in range(args.runs)]
+        for i, record in enumerate(attempts):
+            print(f"     #{i + 1} {record['verdict']}: {record.get('detail', '')}"
+                  f"  ({record['seconds']}s)", flush=True)
+        record = aggregate(attempts) if args.runs > 1 else attempts[0]
+        aggregated.append(record)
+        merged_prev[num] = record
+        print(f"     => {record['verdict']}: {record.get('detail', '')}\n", flush=True)
+        ordered = [merged_prev[k] for k in sorted(merged_prev)]
+        RESULTS_PATH.write_text(json.dumps(ordered, ensure_ascii=False, indent=2),
+                                encoding="utf-8")
 
-    all_records = [merged[k] for k in sorted(merged)]
+    all_records = [merged_prev[k] for k in sorted(merged_prev)]
     write_report(all_records)
 
-    passed = sum(1 for r in records if r["verdict"] == "PASS")
+    passed = sum(1 for r in aggregated if r["verdict"] == "PASS")
     overall = sum(1 for r in all_records if r["verdict"] == "PASS")
     print("=" * 60)
-    print(f"this run: {passed}/{len(records)} PASS")
+    print(f"this run: {passed}/{len(aggregated)} PASS")
     print(f"overall:  {overall}/{len(all_records)} PASS")
     print(f"  {RESULTS_PATH}")
     print(f"  {REPORT_PATH}")
-    return 0 if passed == len(records) else 1
+    return 0 if passed == len(aggregated) else 1
 
 
 if __name__ == "__main__":
